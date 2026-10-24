@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "frontend/**"
+      - ".github/workflows/frontend.yml"
 
 permissions:
   contents: read
@@ -22,14 +23,14 @@ jobs:
     
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
           filter: tree:0
           persist-credentials: false
 
       - name: Pnpm
-        uses: pnpm/setup@v3
+        uses: pnpm/setup@v3.1.1
         with:
           working-directory: frontend
           cache: true
