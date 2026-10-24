@@ -1,0 +1,38 @@
+name: Frontend CI
+
+on:
+  pull_request:
+    paths:
+      - "frontend/**"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    env:
+      PNPM_CONFIG_COLOR: always
+      FORCE_COLOR: "1"
+    
+    defaults:
+      run:
+        working-directory: frontend
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          filter: tree:0
+          persist-credentials: false
+
+      - name: Pnpm
+        uses: pnpm/setup@v3
+        with:
+          working-directory: frontend
+          cache: true
+
+      - name: Angular
+        run: pnpm exec ng build
