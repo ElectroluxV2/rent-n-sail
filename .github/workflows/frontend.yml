@@ -2,6 +2,8 @@ name: Frontend CI
 
 on:
   pull_request:
+    paths:
+      - "frontend/**"
 
 permissions:
   contents: read
@@ -9,6 +11,10 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    
+    env:
+      PNPM_CONFIG_COLOR: always
+      FORCE_COLOR: "1"
     
     defaults:
       run:
