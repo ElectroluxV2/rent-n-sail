@@ -14,3 +14,6 @@
 
 Run the formatter from `frontend` with `pnpm format`.
 To check formatting without changing files, run `pnpm format:check`.
+
+Run the formatter from `backend` with `uv run ruff format`.
+To check formatting without changing files, run `uv run ruff format --check`
