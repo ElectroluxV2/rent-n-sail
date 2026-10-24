@@ -11,10 +11,6 @@ jobs:
     if: github.repository == 'ElectroluxV2/rent-n-sail'
     runs-on: ubuntu-latest
     
-    defaults:
-      run:
-        working-directory: frontend
-
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -26,6 +22,7 @@ jobs:
       - name: Pnpm
         uses: pnpm/setup@v3
         with:
+          working-directory: frontend
           cache: true
 
       - name: Angular
