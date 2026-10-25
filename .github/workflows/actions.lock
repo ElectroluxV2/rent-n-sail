@@ -5,9 +5,11 @@ version: 'v0.0.3'
 workflows:
     '.github/workflows/backend.yml':
         - 'actions/checkout@v7.0.1'
+        - 'astral-sh/ruff-action@v4.1.0'
         - 'astral-sh/setup-uv@v10.3.2'
     '.github/workflows/frontend.yml':
         - 'actions/checkout@v7.0.1'
+        - 'epmatt/reviewdog-action-prettier@v1.3.0'
         - 'pnpm/setup@v3.1.1'
 dependencies:
     'actions/checkout@v7.0.1':
@@ -15,13 +17,43 @@ dependencies:
         commit: 'sha1-3d3c42e5aac5ba805825da76410c181273ba90b1'
         owner_id: 44036562
         repo_id: 197814629
+    'astral-sh/ruff-action@v4.1.0':
+        ref: 'v4.1.0'
+        commit: 'sha1-278981a28ce3188b1e39527901f38254bf3aac89'
+        owner_id: 115962839
+        repo_id: 865075538
     'astral-sh/setup-uv@v10.3.2':
         ref: 'v10.3.2'
         commit: 'sha1-07a047e608db84b3d8c06cd9a7c7dcc9c355c18e'
         owner_id: 115962839
         repo_id: 846733598
+    'epmatt/reviewdog-action-prettier@v1.3.0':
+        ref: 'v1.3.0'
+        commit: 'sha1-f691104cbeb4b0299df971275444c64be93c03ae'
+        owner_id: 30753195
+        repo_id: 464823657
+        uses:
+            - 'reviewdog/action-setup@v1'
+            - 'reviewdog/action-suggester@v1'
     'pnpm/setup@v3.1.1':
         ref: 'v3.1.1'
         commit: 'sha1-a0881977cd8ea73b1ed212236c99ca10dcc80cf4'
         owner_id: 21320719
         repo_id: 1235693694
+    'reviewdog/action-setup@d8a7baabd7f3e8544ee4dbde3ee41d0011c3a93f':
+        ref: 'v1.5.0'
+        commit: 'sha1-d8a7baabd7f3e8544ee4dbde3ee41d0011c3a93f'
+        owner_id: 48765237
+        repo_id: 286005511
+    'reviewdog/action-setup@v1':
+        ref: 'v1'
+        commit: 'sha1-d8a7baabd7f3e8544ee4dbde3ee41d0011c3a93f'
+        owner_id: 48765237
+        repo_id: 286005511
+    'reviewdog/action-suggester@v1':
+        ref: 'v1'
+        commit: 'sha1-ac5ce6d94e35c00530447dc63c271e38e4fd36c6'
+        owner_id: 48765237
+        repo_id: 284627247
+        uses:
+            - 'reviewdog/action-setup@d8a7baabd7f3e8544ee4dbde3ee41d0011c3a93f'

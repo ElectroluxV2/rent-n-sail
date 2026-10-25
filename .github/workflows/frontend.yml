@@ -35,5 +35,14 @@ jobs:
           working-directory: frontend
           cache: true
 
+      - name: Lint (Angular ESLint)
+        run: pnpm exec eslint . --format gha
+        
+      - name: Check formatting (Prettier)
+        uses: EPMatt/reviewdog-action-prettier@v1.3.0
+        with:
+          workdir: frontend
+          reporter: github-pr-check
+
       - name: Angular
         run: pnpm exec ng build

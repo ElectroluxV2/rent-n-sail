@@ -37,3 +37,18 @@ jobs:
 
       - name: Install dependencies
         run: uv sync --locked
+        
+      - name: Lint (Ruff)
+        uses: astral-sh/ruff-action@v4.1.0
+        with:
+          src: backend
+          version-file: backend/uv.lock
+          args: check --output-format=github
+
+      - name: Format (Ruff)
+        uses: astral-sh/ruff-action@v4.1.0
+        continue-on-error: true
+        with:
+          src: backend
+          version-file: backend/uv.lock
+          args: format --check --output-format=github
