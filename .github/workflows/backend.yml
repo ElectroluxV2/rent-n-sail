@@ -60,7 +60,6 @@ jobs:
       - name: Fail if lint or formatting failed
         if: >-
           ${{
-            !cancelled() &&
             ( steps.ruff_lint.outcome == 'failure' ||
               steps.ruff_format.outcome == 'failure' )
           }}
