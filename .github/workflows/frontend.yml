@@ -39,11 +39,10 @@ jobs:
       - name: Lint (Angular ESLint)
         run: pnpm exec eslint . --format gha
         
-      - name: Check formatting (Prettier)
-        uses: EPMatt/reviewdog-action-prettier@v1.3.0
+      - name: Check formatting
+        uses: oxc-project/oxfmt-action@v0.0.1
         with:
-          workdir: frontend
-          reporter: github-pr-check
+          working-directory: frontend
 
       - name: Angular
         run: pnpm exec ng build
