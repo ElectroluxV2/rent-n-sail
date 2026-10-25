@@ -5,6 +5,7 @@ on:
     paths:
       - "backend/**"
       - ".github/workflows/backend.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -36,4 +37,34 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
+        # language=bash
         run: uv sync --locked
+        
+      - name: Lint (Ruff)
+        id: ruff_lint
+        uses: astral-sh/ruff-action@v4.1.0
+        continue-on-error: true
+        with:
+          src: backend
+          version-file: backend/uv.lock
+          # language=bash
+          args: check --output-format=github
+
+      - name: Format (Ruff)
+        id: ruff_format
+        uses: astral-sh/ruff-action@v4.1.0
+        continue-on-error: true
+        with:
+          src: backend
+          version-file: backend/uv.lock
+          # language=bash
+          args: format --check --output-format=github
+
+      - name: Fail if lint or formatting failed
+        if: >-
+          ${{
+              steps.ruff_lint.outcome == 'failure' ||
+              steps.ruff_format.outcome == 'failure'
+          }}  
+        # language=bash
+        run: exit 1

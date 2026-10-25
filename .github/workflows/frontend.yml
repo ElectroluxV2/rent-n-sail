@@ -5,6 +5,7 @@ on:
     paths:
       - "frontend/**"
       - ".github/workflows/frontend.yml"
+  workflow_dispatch: 
 
 permissions:
   contents: read
@@ -35,5 +36,28 @@ jobs:
           working-directory: frontend
           cache: true
 
+      - name: Lint (Angular ESLint)
+        id: lint
+        # language=bash
+        run: pnpm exec eslint . --format gha
+        continue-on-error: true
+      
+      - name: Check formatting
+        id: format
+        uses: oxc-project/oxfmt-action@v0.0.1
+        continue-on-error: true
+        with:
+          working-directory: frontend
+
       - name: Angular
+        # language=bash
         run: pnpm exec ng build
+
+      - name: Fail if lint or formatting failed
+        if: >-
+          ${{
+              steps.lint.outcome == 'failure' ||
+              steps.format.outcome == 'failure'
+          }}  
+        # language=bash
+        run: exit 1

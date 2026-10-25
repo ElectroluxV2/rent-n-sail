@@ -5,9 +5,11 @@ version: 'v0.0.3'
 workflows:
     '.github/workflows/backend.yml':
         - 'actions/checkout@v7.0.1'
+        - 'astral-sh/ruff-action@v4.1.0'
         - 'astral-sh/setup-uv@v10.3.2'
     '.github/workflows/frontend.yml':
         - 'actions/checkout@v7.0.1'
+        - 'oxc-project/oxfmt-action@v0.0.1'
         - 'pnpm/setup@v3.1.1'
 dependencies:
     'actions/checkout@v7.0.1':
@@ -15,11 +17,21 @@ dependencies:
         commit: 'sha1-3d3c42e5aac5ba805825da76410c181273ba90b1'
         owner_id: 44036562
         repo_id: 197814629
+    'astral-sh/ruff-action@v4.1.0':
+        ref: 'v4.1.0'
+        commit: 'sha1-278981a28ce3188b1e39527901f38254bf3aac89'
+        owner_id: 115962839
+        repo_id: 865075538
     'astral-sh/setup-uv@v10.3.2':
         ref: 'v10.3.2'
         commit: 'sha1-07a047e608db84b3d8c06cd9a7c7dcc9c355c18e'
         owner_id: 115962839
         repo_id: 846733598
+    'oxc-project/oxfmt-action@v0.0.1':
+        ref: 'v0.0.1'
+        commit: 'sha1-5f25fc2dccfa7335bc29ceceecc610d8b5c93d64'
+        owner_id: 149946238
+        repo_id: 1204659040
     'pnpm/setup@v3.1.1':
         ref: 'v3.1.1'
         commit: 'sha1-a0881977cd8ea73b1ed212236c99ca10dcc80cf4'
