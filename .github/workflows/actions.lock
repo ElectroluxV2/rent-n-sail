@@ -9,7 +9,7 @@ workflows:
         - 'astral-sh/setup-uv@v10.3.2'
     '.github/workflows/frontend.yml':
         - 'actions/checkout@v7.0.1'
-        - 'epmatt/reviewdog-action-prettier@v1.3.0'
+        - 'oxc-project/oxfmt-action@v0.0.1'
         - 'pnpm/setup@v3.1.1'
 dependencies:
     'actions/checkout@v7.0.1':
@@ -27,33 +27,13 @@ dependencies:
         commit: 'sha1-07a047e608db84b3d8c06cd9a7c7dcc9c355c18e'
         owner_id: 115962839
         repo_id: 846733598
-    'epmatt/reviewdog-action-prettier@v1.3.0':
-        ref: 'v1.3.0'
-        commit: 'sha1-f691104cbeb4b0299df971275444c64be93c03ae'
-        owner_id: 30753195
-        repo_id: 464823657
-        uses:
-            - 'reviewdog/action-setup@v1'
-            - 'reviewdog/action-suggester@v1'
+    'oxc-project/oxfmt-action@v0.0.1':
+        ref: 'v0.0.1'
+        commit: 'sha1-5f25fc2dccfa7335bc29ceceecc610d8b5c93d64'
+        owner_id: 149946238
+        repo_id: 1204659040
     'pnpm/setup@v3.1.1':
         ref: 'v3.1.1'
         commit: 'sha1-a0881977cd8ea73b1ed212236c99ca10dcc80cf4'
         owner_id: 21320719
         repo_id: 1235693694
-    'reviewdog/action-setup@d8a7baabd7f3e8544ee4dbde3ee41d0011c3a93f':
-        ref: 'v1.5.0'
-        commit: 'sha1-d8a7baabd7f3e8544ee4dbde3ee41d0011c3a93f'
-        owner_id: 48765237
-        repo_id: 286005511
-    'reviewdog/action-setup@v1':
-        ref: 'v1'
-        commit: 'sha1-d8a7baabd7f3e8544ee4dbde3ee41d0011c3a93f'
-        owner_id: 48765237
-        repo_id: 286005511
-    'reviewdog/action-suggester@v1':
-        ref: 'v1'
-        commit: 'sha1-ac5ce6d94e35c00530447dc63c271e38e4fd36c6'
-        owner_id: 48765237
-        repo_id: 284627247
-        uses:
-            - 'reviewdog/action-setup@d8a7baabd7f3e8544ee4dbde3ee41d0011c3a93f'
