@@ -37,6 +37,7 @@ jobs:
           cache: true
 
       - name: Lint (Angular ESLint)
+        # language=bash
         run: pnpm exec eslint . --format gha
         
       - name: Check formatting
@@ -45,4 +46,5 @@ jobs:
           working-directory: frontend
 
       - name: Angular
+        # language=bash
         run: pnpm exec ng build

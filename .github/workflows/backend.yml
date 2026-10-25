@@ -37,6 +37,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
+        # language=bash
         run: uv sync --locked
         
       - name: Lint (Ruff)
@@ -46,6 +47,7 @@ jobs:
         with:
           src: backend
           version-file: backend/uv.lock
+          # language=bash
           args: check --output-format=github
 
       - name: Format (Ruff)
@@ -55,6 +57,7 @@ jobs:
         with:
           src: backend
           version-file: backend/uv.lock
+          # language=bash
           args: format --check --output-format=github
 
       - name: Fail if lint or formatting failed
@@ -62,5 +65,6 @@ jobs:
           ${{
               steps.ruff_lint.outcome == 'failure' ||
               steps.ruff_format.outcome == 'failure'
-          }}
+          }}  
+        # language=bash
         run: exit 1
