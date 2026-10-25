@@ -35,6 +35,7 @@
     "@types/node": "^22.12.0",
     "angular-eslint": "^22.6.0",
     "eslint": "^10.13.0",
+    "eslint-formatter-gha": "^2.0.1",
     "jsdom": "^30.0.0",
     "oxfmt": "^0.74.0",
     "typescript": "~6.0.2",
