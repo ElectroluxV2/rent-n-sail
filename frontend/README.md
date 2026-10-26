@@ -2,6 +2,16 @@
 
 This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 22.2.4.
 
+## Vercel deployment
+
+The frontend and backend use separate Vercel projects. Postgres is hosted by Neon and is accessed only by the backend, not by browsers.
+
+- `api/index.js` exposes the compiled Angular SSR handler as a [Vercel Node.js Function](https://vercel.com/docs/functions/runtimes/node-js). The browser build alone does not provide that function. The page rewrites in `vercel.json` route requests to this handler, while static assets are served directly.
+- The `/api` rewrites proxy browser requests to the backend project, preserving the same-origin URL used by `BACKEND_API_URL`. Calling the backend domain directly instead would require frontend API URL configuration and backend CORS settings; separate project domains do not provide that automatically.
+- SSR calls the backend through `BACKEND_URL`, which must be configured on the frontend Vercel project. The transfer-cache origin map aligns that response with the browser's same-origin `/api` URL.
+
+Portless can provide local service hostnames, but it does not configure Vercel's production routing or CORS. Switching local development tools is separate from removing these production rewrites.
+
 ## Development server
 
 To start a local development server, run:

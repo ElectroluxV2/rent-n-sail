@@ -1,5 +1,14 @@
 # AI usage docs
 
+## 2026-10-26 — PR #14 review feedback
+
+- AI assistance: OpenCode (GPT-6.1 Sol) assessed the 13 review threads on [PR #14](https://github.com/Renters-Sailors/rent-n-sail/pull/14), implemented the requested workflow simplifications, and prepared replies explaining the changes and deployment architecture.
+- Author attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- Extracted cached CLI setup into its own composite action, moved non-secret Vercel settings to workflow-level environments, removed token arguments and duplicate command branches, and required explicit existing config files. Preview branch selection uses GitHub's built-in `GITHUB_HEAD_REF` directly.
+- Consolidated each workflow into one job, shared path filters and deployment conditions with YAML anchors, removed pnpm setup from backend validation, and made Angular builds unconditional after successful checks. pnpm and Node.js versions now come from `frontend/package.json`; the shared CLI setup skips frontend dependency installation and reuses an initialized toolchain. Deployment credentials remain scoped to the guarded deployment step, and merging backend jobs preserves uv for the Vercel Python build.
+- Documented why the Angular SSR function adapter and same-origin API rewrites are needed, explained the separate frontend/backend/Neon roles and local-only scope of Portless, and linked Vercel's system-variable documentation beside the allowed-host variables.
+- Verification: frontend ESLint, formatting, Angular unit tests and production build passed; backend Ruff lint and formatting passed. The extracted setup installed Vercel 65.2.0. Exercised preview/production command arguments, missing configs, and pull/build failures using a mock CLI, and rendered backend fixture data through the real compiled SSR adapter under a Vercel preview hostname. Actionlint passed with its existing narrow exception for `$/` action syntax; ShellCheck and the online action-lock verification passed.
+
 ## 2026-10-26 — Personal commit signing for this clone
 
 - AI assistance: OpenCode (GPT-6.1 Sol) configured this clone to sign commits with the author's personal GitHub identity and SSH signing key.

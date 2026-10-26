@@ -10,6 +10,8 @@ import { join } from 'node:path';
 const browserDistFolder = join(import.meta.dirname, '../browser');
 
 const app = express();
+// Vercel provides these deployment domains at runtime, without a URL scheme:
+// https://vercel.com/docs/environment-variables/system-environment-variables
 const allowedHosts = [
   process.env['VERCEL_URL'],
   process.env['VERCEL_BRANCH_URL'],

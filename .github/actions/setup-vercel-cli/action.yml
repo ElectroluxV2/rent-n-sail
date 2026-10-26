@@ -1,0 +1,58 @@
+name: Set up Vercel CLI
+description: Install the shared JavaScript toolchain and restore a ready-to-run Vercel CLI.
+inputs:
+  version:
+    description: Exact Vercel CLI version to install and cache.
+    default: 65.2.0
+runs:
+  using: composite
+  steps:
+    - name: Set up pnpm and Node.js from package.json
+      if: env.PNPM_HOME == ''
+      uses: pnpm/setup@v3.1.1
+      with:
+        working-directory: frontend
+        install: false
+
+    - name: Prepare Vercel CLI cache
+      id: vercel_cli
+      shell: bash
+      # language=bash
+      run: |
+        node_version=$(node --version)
+        pnpm_version=$(pnpm --version)
+        {
+          echo "node-version=$node_version"
+          echo "pnpm-version=$pnpm_version"
+        } >> "$GITHUB_OUTPUT"
+        echo "$RUNNER_TOOL_CACHE/vercel-cli/node_modules/.bin" >> "$GITHUB_PATH"
+
+    - name: Restore Vercel CLI cache
+      id: vercel_cli_cache
+      uses: actions/cache/restore@v6.1.0
+      with:
+        path: ${{ runner.tool_cache }}/vercel-cli
+        key: vercel-cli-v1-${{ runner.os }}-${{ runner.arch }}-node-${{ steps.vercel_cli.outputs.node-version }}-pnpm-${{ steps.vercel_cli.outputs.pnpm-version }}-vercel-${{ inputs.version }}
+
+    - name: Install Vercel CLI with pnpm
+      if: steps.vercel_cli_cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        VERCEL_CLI_VERSION: ${{ inputs.version }}
+      # language=bash
+      run: |
+        mkdir -p "$RUNNER_TOOL_CACHE/vercel-cli"
+        # Keep package links inside the cached installation.
+        pnpm --dir "$RUNNER_TOOL_CACHE/vercel-cli" add --save-exact \
+          --allow-build=esbuild \
+          --store-dir "$RUNNER_TEMP/vercel-cli-store" \
+          --config.virtual-store-type=project \
+          "vercel@$VERCEL_CLI_VERSION"
+        vercel --version
+
+    - name: Save Vercel CLI cache
+      if: steps.vercel_cli_cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6.1.0
+      with:
+        path: ${{ runner.tool_cache }}/vercel-cli
+        key: ${{ steps.vercel_cli_cache.outputs.cache-primary-key }}
