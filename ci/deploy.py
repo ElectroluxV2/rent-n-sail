@@ -649,9 +649,15 @@ def runtime_diagnostics(state):
         for line in logs.stdout.splitlines():
             try:
                 record = json.loads(line)
-                message = record.get("data", record).get("message")
-                if isinstance(message, str):
-                    messages.append(message)
+                data = record.get("data", record)
+                # CLI 65 emits request records with nested logs; newer formats
+                # wrap individual runtime messages in a typed data envelope.
+                entries = data.get("logs") or [data]
+                messages.extend(
+                    entry["message"]
+                    for entry in entries
+                    if isinstance(entry, dict) and isinstance(entry.get("message"), str)
+                )
             except (ValueError, AttributeError):
                 continue
         if messages:
@@ -662,6 +668,7 @@ def runtime_diagnostics(state):
         else:
             print(
                 "Runtime log query returned no message records. "
+                + f"CLI exit status: {logs.returncode}. "
                 + sanitized(logs.stderr[-1500:], state)
             )
     except subprocess.TimeoutExpired:

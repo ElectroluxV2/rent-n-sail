@@ -25,6 +25,7 @@ from ci.deploy import (
     publish,
     resolve_mode,
     restore_output,
+    runtime_diagnostics,
     select_deployment,
     smoke,
 )
@@ -310,6 +311,39 @@ class NeonTests(unittest.TestCase):
 
 
 class ProviderBindingTests(unittest.TestCase):
+    def test_runtime_diagnostics_reads_nested_vercel_request_messages(self):
+        records = [
+            {
+                "requestPath": "/api/boats",
+                "logs": [
+                    {"message": "Driver init failed for postgresql://private-fixture"},
+                    {"message": "ImportError: test diagnostic"},
+                ],
+            },
+            {"type": "log", "data": {"message": "Wrapped message"}},
+        ]
+        with (
+            patch(
+                "ci.deploy.subprocess.run",
+                return_value=CompletedProcess(
+                    [], 0, "\n".join(json.dumps(record) for record in records), ""
+                ),
+            ),
+            patch("sys.stdout", new_callable=io.StringIO) as captured,
+        ):
+            runtime_diagnostics(
+                {
+                    "component": "frontend",
+                    "project_id": "project",
+                    "alias": "frontend.test",
+                    "deployment_id": "dpl_test",
+                    "runtime": {"DATABASE_URL": "postgresql://private-fixture"},
+                }
+            )
+        self.assertIn("ImportError: test diagnostic", captured.getvalue())
+        self.assertIn("Wrapped message", captured.getvalue())
+        self.assertNotIn("private-fixture", captured.getvalue())
+
     def test_publish_passes_runtime_bindings_at_deployment_scope_without_secret_arguments(
         self,
     ):
