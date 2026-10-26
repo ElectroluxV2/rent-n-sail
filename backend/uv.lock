@@ -116,12 +116,12 @@ dependencies = [
     { name = "fastapi", extra = ["standard"] },
     { name = "greenlet" },
     { name = "pydantic" },
-    { name = "pytest" },
     { name = "uvicorn" },
 ]
 
 [package.dev-dependencies]
 dev = [
+    { name = "pytest" },
     { name = "pytest-github-actions-annotate-failures" },
     { name = "ruff" },
     { name = "scalar-fastapi" },
@@ -133,12 +133,12 @@ requires-dist = [
     { name = "fastapi", extras = ["standard"], specifier = ">=0.162.0" },
     { name = "greenlet", specifier = ">=3.5.6" },
     { name = "pydantic", specifier = ">=2.14.1" },
-    { name = "pytest", specifier = ">=9.1.1" },
     { name = "uvicorn", specifier = ">=0.54.0" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "pytest", specifier = ">=9.1.1" },
     { name = "pytest-github-actions-annotate-failures", specifier = ">=0.4.2" },
     { name = "ruff", specifier = ">=0.17.2" },
     { name = "scalar-fastapi", specifier = ">=1.9.1" },
