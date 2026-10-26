@@ -32,9 +32,9 @@ describe('App', () => {
     const element = fixture.nativeElement as HTMLElement;
     expect(element.textContent).toContain('Backend says: World');
 
-    element.querySelector('form')?.dispatchEvent(
-      new Event('submit', { bubbles: true, cancelable: true }),
-    );
+    element
+      .querySelector('form')
+      ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     fixture.detectChanges();
     http.expectOne('https://frontend.test/api').flush({ Hello: 'World again' });
     await fixture.whenStable();

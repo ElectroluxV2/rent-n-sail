@@ -1,0 +1,23 @@
+<button type="button" (click)="startFlow()" [disabled]="isStarting()">StartFlow</button>
+
+@if (canCreateAccount()) {
+  <form (submit)="createAccount($event)">
+    <label for="passkey-username">Username</label>
+    <input
+      id="passkey-username"
+      name="username"
+      [(ngModel)]="username"
+      required
+      autocomplete="username"
+    />
+    <button type="submit" [disabled]="isStarting()">Register</button>
+  </form>
+}
+
+@if (status()) {
+  <p role="status">{{ status() }}</p>
+}
+
+@if (error()) {
+  <p role="alert">{{ error() }}</p>
+}
