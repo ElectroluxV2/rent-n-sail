@@ -45,74 +45,76 @@ jobs:
       NEON_ROLE_NAME: ${{ vars.NEON_ROLE_NAME || 'neondb_owner' }}
       UV_PYTHON_PREFERENCE: only-managed
     steps:
-      - uses: actions/checkout@v7.0.1
+      - name: 📥 Checkout source
+        uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Check database changes
+      - name: 🔍 Check database changes
         id: changes
         if: github.event_name == 'push' || github.event.action == 'synchronize'
         uses: $/.github/actions/component-changes
         with:
           path: database/
-      - name: Test Bash CI/CD
+      - name: 🧪 Test CI scripts
         # language=bash
         run: bash ci/test.sh
-      - name: Select migration path
+      - name: 🧭 Select migration path
         id: selection
         env:
           BUILD: ${{ inputs.build || steps.changes.outputs.changed == 'true' || github.event.action == 'opened' || github.event.action == 'reopened' }}
         # language=bash
         run: echo "build=$BUILD" >> "$GITHUB_OUTPUT"
-      - name: Ensure copy-on-write preview branch
+      - name: 🌱 Ensure preview branch
         id: branch
         if: env.DEPLOY_TARGET == 'preview'
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
         # language=bash
         run: bash ci/deploy.sh database-branch
-      - name: Resolve production parent
+      - name: 🔗 Resolve production parent
         id: plan
         if: env.DEPLOY_TARGET == 'production' || steps.selection.outputs.build == 'true'
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
         # language=bash
         run: bash ci/deploy.sh database-plan
-      - name: Select database reference
+      - name: 🧭 Select database reference
         id: reference
         env:
           NEON_BRANCH_ID: ${{ env.DEPLOY_TARGET == 'preview' && steps.branch.outputs.branch_id || steps.plan.outputs.parent_branch_id }}
         # language=bash
         run: echo "branch_id=$NEON_BRANCH_ID" >> "$GITHUB_OUTPUT"
-      - uses: astral-sh/setup-uv@v10.3.2
+      - name: ⚙️ Set up uv and Python
+        uses: astral-sh/setup-uv@v10.3.2
         if: steps.selection.outputs.build == 'true'
         with:
           working-directory: database
           enable-cache: true
           cache-python: true
           activate-environment: true
-      - name: Install migration tools
+      - name: 📦 Install migration tools
         if: steps.selection.outputs.build == 'true'
         # language=bash
         run: uv sync --directory database --locked
-      - name: Test migrations
+      - name: 🧪 Test migrations
         if: steps.selection.outputs.build == 'true'
         env:
           PYTEST_RUN_PATH: database
         # language=bash
         run: uv run --directory database --locked pytest -q
-      - name: Resolve direct migration credentials privately
+      - name: 🔐 Resolve migration credentials
         if: steps.selection.outputs.build == 'true'
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
           NEON_BRANCH_ID: ${{ steps.reference.outputs.branch_id }}
         # language=bash
         run: bash ci/deploy.sh database-env
-      - name: Migrate selected database
+      - name: 🚀 Apply migrations
         if: steps.selection.outputs.build == 'true'
         # language=bash
         run: uv run --directory database --locked alembic upgrade head
-      - name: Comment schema changes on the PR
+      - name: 📝 Comment schema changes
         if: steps.selection.outputs.build == 'true' && github.event_name == 'pull_request' && env.DEPLOY_TARGET == 'preview'
         uses: neondatabase/schema-diff-action@v1.0.1
         with:
@@ -121,7 +123,7 @@ jobs:
           base_branch: ${{ steps.plan.outputs.parent_branch_id }}
           compare_branch: ${{ steps.reference.outputs.branch_id }}
           database: ${{ env.NEON_DATABASE_NAME }}
-      - name: Database summary
+      - name: 📝 Write deployment summary
         env:
           NEON_BRANCH_ID: ${{ steps.reference.outputs.branch_id }}
         # language=bash

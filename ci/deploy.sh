@@ -143,71 +143,6 @@ publish() {
     printf '## %s deployment\n\n- Target: %s\n- Mode: %s\n- URL: <%s>\n' "$component" "$target" "$mode" "$url" >> "$GITHUB_STEP_SUMMARY"
   fi
 }
-header_value() {
-  awk -v key="$1" 'tolower(substr($0,1,length(key)+1)) == key ":" {value=substr($0,length(key)+2); sub(/^[ \t]+/,"",value); sub(/\r$/, "", value)} END {print value}' "$2"
-}
-verify_ssr_state() {
-  local expected=${2%/}/
-  jq -Rse --arg url "$expected" '
-    [scan("<script\\b(?=[^>]*\\btype=\"application/json\")(?=[^>]*\\bid=\"[^\"]*-state\")[^>]*>(.*?)</script>";"s") | .[0] | fromjson]
-    | any(.[]; .["backend-api-url"] == $url and any(.[]; type == "object" and .s == 200 and .u == $url and (.b.Hello | type) == "string"))' "$1" >/dev/null || die 'Angular SSR did not transfer a successful HttpClient response from the backend root URL.'
-}
-runtime_diagnostics() {
-  local url project id logs
-  url=$(jq -r '.url' "$STATE_FILE"); project=$(jq -r '.project_id' "$STATE_FILE"); id=$(jq -r '.deployment_id' "$STATE_FILE")
-  if [[ $(jq -r '.component' "$STATE_FILE") == backend ]]; then
-    if VERCEL_PROJECT_ID=$project vercel curl "$url/health" -- --fail --silent --show-error --max-time 30 >/dev/null 2>&1; then
-      printf 'Diagnostic health probe: healthy.\n'
-    else printf 'Diagnostic health probe: failed.\n'; fi
-  fi
-  if VERCEL_PROJECT_ID=$project vercel logs --project "$project" --deployment "$id" --since 10m --limit 40 --json > "$CI_TMP/logs" 2> "$CI_TMP/log-errors"; then
-    logs=$(jq -r '(.data // .) | (.logs // [.])[] | .message // empty' "$CI_TMP/logs")
-    sanitize "${logs:0:12000}"
-  else sanitize "$(cat "$CI_TMP/log-errors")"; fi
-}
-verify_browser_wiring() {
-  local frontend backend url status method headers="$CI_TMP/browser-headers" body="$CI_TMP/browser-body"
-  frontend=$(jq -r '.runtime.FRONTEND_URL' "$STATE_FILE"); backend=$(jq -r '.runtime.BACKEND_URL' "$STATE_FILE"); backend=${backend%/}/
-  for method in GET OPTIONS; do
-    local args=(--disable --silent --show-error --max-time 30 --request "$method" --header "Origin: $frontend" --dump-header "$headers" --output "$body" --write-out '%{http_code}')
-    [[ "$method" != OPTIONS ]] || args+=(--header 'Access-Control-Request-Method: GET' --header 'Access-Control-Request-Headers: Content-Type')
-    status=$(env -u VERCEL_TOKEN -u NEON_API_KEY -u GITHUB_TOKEN -u GH_TOKEN curl "${args[@]}" "$backend") || die 'Anonymous browser API network request failed.'
-    if [[ "$status" != 200 ]]; then
-      [[ $(header_value location "$headers") != https://vercel.com/* ]] || die 'Browser API access is blocked by Vercel Deployment Protection before CORS.'
-      die "Anonymous backend $method verification failed (HTTP $status)."
-    fi
-    [[ $(header_value access-control-allow-origin "$headers") == "$frontend" ]] || die 'Browser CORS does not allow the exact frontend origin.'
-    if [[ "$method" == GET ]]; then
-      jq -e 'type == "object" and (.Hello | type) == "string"' "$body" >/dev/null || die 'The browser API root did not return the expected JSON.'
-    else
-      header_value access-control-allow-methods "$headers" | jq -Re 'split(",") | any(.[]; gsub("^ +| +$";"") == "GET")' >/dev/null || die 'Browser preflight did not allow GET.'
-      header_value access-control-allow-headers "$headers" | jq -Re 'ascii_downcase | split(",") | any(.[]; gsub("^ +| +$";"") == "content-type")' >/dev/null || die 'Browser preflight did not allow Content-Type.'
-    fi
-  done
-  printf 'Verified anonymous backend root and exact browser GET/preflight CORS.\n'
-  url=$(jq -r '.url' "$STATE_FILE")
-  VERCEL_PROJECT_ID=$(jq -r '.project_id' "$STATE_FILE") vercel curl "${url%/}/" -- --fail --silent --show-error --max-time 30 > "$CI_TMP/ssr.html" 2> "$CI_TMP/ssr-errors" || die 'Could not retrieve frontend SSR output.'
-  verify_ssr_state "$CI_TMP/ssr.html" "$backend"
-  printf 'Verified deployed Angular SSR HttpClient transfer state.\n'
-}
-smoke() {
-  local component url project origin path
-  component=$(jq -r '.component' "$STATE_FILE"); url=$(jq -r '.url' "$STATE_FILE"); project=$(jq -r '.project_id' "$STATE_FILE")
-  path=/runtime-config.json; [[ "$component" != backend ]] || path=/boats
-  local args=(curl "$url$path" -- --fail --silent --show-error --max-time 30 --dump-header "$CI_TMP/headers")
-  if [[ "$component" == backend ]]; then origin=$(jq -r '.runtime.CORS_ALLOWED_ORIGINS' "$STATE_FILE"); args+=(-H "Origin: $origin"); fi
-  if ! VERCEL_PROJECT_ID=$project vercel "${args[@]}" > "$CI_TMP/body" 2> "$CI_TMP/errors"; then
-    sanitize "$(cat "$CI_TMP/errors")"; runtime_diagnostics; die 'Authenticated application HTTP verification failed.'
-  fi
-  if [[ "$component" == backend ]]; then
-    jq -e 'type == "array" and all(.[]; type == "object" and has("id") and has("name") and has("daily_rate"))' "$CI_TMP/body" >/dev/null || die 'The backend did not return migrated inventory.'
-    [[ $(header_value access-control-allow-origin "$CI_TMP/headers") == "$origin" ]] || die 'The backend did not allow the exact frontend origin.'
-    printf 'Verified live backend inventory (%s rows) and explicit CORS.\n' "$(jq length "$CI_TMP/body")"
-  else
-    jq -e --slurpfile state "$STATE_FILE" '.backendUrl == $state[0].runtime.BACKEND_URL' "$CI_TMP/body" >/dev/null || die 'Frontend runtime configuration does not match the resolved backend.'
-    printf 'Verified frontend runtime configuration.\n'; verify_browser_wiring
-  fi
-}
 main() {
   CI_TMP=$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/rns-ci.XXXXXX")
   trap 'rm -rf -- "$CI_TMP"' EXIT
@@ -229,7 +164,6 @@ main() {
       ;;
     restore) restore_output "${ARCHIVE_PATH:?}" .vercel/output "$(jq -r '.component' "${STATE_FILE:?}")" ;;
     publish) publish ;;
-    smoke) smoke ;;
     *) die 'Unknown deployment operation.' ;;
   esac
 }

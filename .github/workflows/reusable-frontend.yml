@@ -45,17 +45,18 @@ jobs:
       VERCEL_PROJECT_ID: ${{ vars.VERCEL_FRONTEND_PROJECT_ID }}
       VERCEL_LOCAL_CONFIG: frontend/vercel.json
     steps:
-      - uses: actions/checkout@v7.0.1
+      - name: 📥 Checkout source
+        uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Check frontend changes
+      - name: 🔍 Check frontend changes
         id: changes
         if: github.event_name == 'push' || github.event.action == 'synchronize'
         uses: $/.github/actions/component-changes
         with:
           path: frontend/
-      - name: Select build path
+      - name: 🧭 Select build path
         id: selection
         env:
           BUILD: ${{ inputs.build || steps.changes.outputs.changed == 'true' || github.event.action == 'opened' || github.event.action == 'reopened' }}
@@ -63,46 +64,47 @@ jobs:
         run: |
           echo "build=$BUILD" >> "$GITHUB_OUTPUT"
           echo "BUILD_REQUESTED=$BUILD" >> "$GITHUB_ENV"
-      - uses: pnpm/setup@v3.1.1
+      - name: ⚙️ Set up Node.js and pnpm
+        uses: pnpm/setup@v3.1.1
         if: steps.selection.outputs.build == 'true'
         with:
           working-directory: frontend
           cache: true
-      - name: Lint
+      - name: 🧹 Lint
         id: lint
         if: steps.selection.outputs.build == 'true'
         continue-on-error: true
         working-directory: frontend
         # language=bash
         run: pnpm exec eslint . --format gha
-      - name: Format
+      - name: 🎨 Check formatting
         id: format
         if: steps.selection.outputs.build == 'true'
         continue-on-error: true
         uses: oxc-project/oxfmt-action@v0.0.1
         with:
           working-directory: frontend
-      - name: Tests with GitHub annotations
+      - name: 🧪 Run tests
         id: tests
         if: steps.selection.outputs.build == 'true'
         continue-on-error: true
         working-directory: frontend
         # language=bash
         run: pnpm exec ng test --watch=false --reporters=default --reporters=github-actions
-      - name: Production build
+      - name: 🔨 Build application
         id: build
         if: steps.selection.outputs.build == 'true'
         continue-on-error: true
         working-directory: frontend
         # language=bash
         run: pnpm exec ng build
-      - name: Fail after all selected checks
+      - name: ❌ Report validation failure
         if: contains(steps.*.outcome, 'failure')
         # language=bash
         run: |
           echo "::error::Frontend validation failed."
           exit 1
-      - name: Ensure frontend deployment
+      - name: 🚀 Ensure deployment
         id: deploy
         uses: $/.github/actions/vercel-prebuilt-deploy
         env:

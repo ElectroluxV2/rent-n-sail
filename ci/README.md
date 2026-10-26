@@ -14,6 +14,16 @@ The selected frontend production build is compiled once during validation. Verce
 
 Every target is serialized across automatic/manual runs with a non-cancelling queue. Each application/database also has a shared per-target concurrency group and a GitHub Environment.
 
+## Step names
+
+Every configured workflow/composite step has an explicit emoji-prefixed name. The same purpose uses the same prefix across jobs:
+
+- 📥 fetch/checkout/restore; 📤 upload/cache save.
+- ⚙️ tool setup; 📦 dependency installation; 🗜️ artifact packaging.
+- 🔍 change detection; 🧭 path/reference selection; 🔗 resource resolution; 🌱 branch preparation; 🔐 credentials.
+- 🧹 lint; 🎨 formatting; 🧪 tests; 🔨 builds.
+- 🚀 publication/migrations; 📝 reports; ❌ failures.
+
 ## Repository setup
 
 Secrets:
@@ -34,7 +44,7 @@ GitHub Actions now owns explicit preview branch preparation so database-first or
 
 ## Selective builds and portable output
 
-For an unchanged application, the resolver checks for an existing READY deployment for the current branch first. If present, it reports the existing URL and stops: no other application's dependency lookup, CLI setup, validation/smoke tests, clone, rebuild, redeployment, alias change, or credential rebind—even when source/configuration has changed since an earlier unsuccessful run. This is the requested per-push policy; there is no source/config fingerprint override. Only when that preview is absent does it restore production's retained compiled output and bind it to the preview environment. Changed applications run their own full validation/build path.
+For an unchanged application, the resolver checks for an existing READY deployment for the current branch first. If present, it reports the existing URL and stops: no other application's dependency lookup, CLI setup, application validation, clone, rebuild, redeployment, alias change, or credential rebind—even when source/configuration has changed since an earlier unsuccessful run. This is the requested per-push policy; there is no source/config fingerprint override. Only when that preview is absent does it restore production's retained compiled output and bind it to the preview environment. Changed applications run their own full validation/build path.
 
 Vercel's [documented create-deployment API](https://vercel.com/docs/rest-api/deployments/create-a-new-deployment) describes `deploymentId` as a new build. Promotion changes production traffic, not preview runtime configuration. Until a supported zero-build clone endpoint is available, a small GitHub artifact containing compiled Build Output is the portable fallback; no OCI registry is used.
 
@@ -52,7 +62,7 @@ The backend exposes `/`, `/health`, and `/boats` directly, without an `/api` pre
 
 Backend preview URLs must be accessible to browser API calls. Vercel team-login protection cannot be solved by exposing an automation bypass secret to JavaScript. Configure the backend API's deployment protection deliberately; these workflows do not silently disable project security.
 
-For newly published deployments (build or production-output restore), CI verifies the inventory/explicit CORS header and frontend runtime-config URL using authenticated `vercel curl`, which keeps protection bypass handling inside the trusted CLI. After frontend publication it also checks anonymous backend root GET/preflight requests with the exact frontend origin, without cookies or bypass credentials, then retrieves the frontend SSR page and verifies that Angular serialized a successful backend HttpClient response—not merely its URL. A sign-in redirect fails with an actionable Deployment Protection error. These checks do not change access policy or expose a bypass token to the client. Existing READY previews are reused without these checks or CLI setup, as required by the no-op reuse policy; a successful reuse run does not claim a fresh SSR validation.
+Publication waits for Vercel's READY status, assigns the stable URL, and records deployment outputs/summaries. Post-deployment HTTP/CORS/SSR probes and runtime-log debugging have been removed; deployment success does not claim an end-to-end browser validation. Normal lint, formatting, application/migration tests, build checks, artifact provenance checks, and credential-safety checks remain in place. Existing READY previews are reused without CLI setup, as required by the no-op reuse policy.
 
 Fork PRs do not receive repository secrets under the normal `pull_request` trigger and cannot deploy a credential-backed stack. There is no privileged `pull_request_target` checkout of fork code.
 

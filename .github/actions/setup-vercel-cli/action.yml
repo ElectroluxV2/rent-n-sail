@@ -7,14 +7,14 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Set up pnpm and Node.js from package.json
+    - name: ⚙️ Set up Node.js and pnpm
       if: env.PNPM_HOME == ''
       uses: pnpm/setup@v3.1.1
       with:
         working-directory: frontend
         install: false
 
-    - name: Prepare Vercel CLI cache
+    - name: ⚙️ Prepare Vercel CLI cache
       id: vercel_cli
       shell: bash
       # language=bash
@@ -27,14 +27,14 @@ runs:
         } >> "$GITHUB_OUTPUT"
         echo "$RUNNER_TOOL_CACHE/vercel-cli/node_modules/.bin" >> "$GITHUB_PATH"
 
-    - name: Restore Vercel CLI cache
+    - name: 📥 Restore Vercel CLI cache
       id: vercel_cli_cache
       uses: actions/cache/restore@v6.1.0
       with:
         path: ${{ runner.tool_cache }}/vercel-cli
         key: vercel-cli-v1-${{ runner.os }}-${{ runner.arch }}-node-${{ steps.vercel_cli.outputs.node-version }}-pnpm-${{ steps.vercel_cli.outputs.pnpm-version }}-vercel-${{ inputs.version }}
 
-    - name: Install Vercel CLI with pnpm
+    - name: 📦 Install Vercel CLI
       if: steps.vercel_cli_cache.outputs.cache-hit != 'true'
       shell: bash
       env:
@@ -50,7 +50,7 @@ runs:
           "vercel@$VERCEL_CLI_VERSION"
         vercel --version
 
-    - name: Save Vercel CLI cache
+    - name: 📤 Save Vercel CLI cache
       if: steps.vercel_cli_cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@v6.1.0
       with:

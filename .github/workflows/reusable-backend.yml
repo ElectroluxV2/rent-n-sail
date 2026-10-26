@@ -53,17 +53,18 @@ jobs:
       VERCEL_LOCAL_CONFIG: vercel.json
       UV_PYTHON_PREFERENCE: only-managed
     steps:
-      - uses: actions/checkout@v7.0.1
+      - name: 📥 Checkout source
+        uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Check backend changes
+      - name: 🔍 Check backend changes
         id: changes
         if: github.event_name == 'push' || github.event.action == 'synchronize'
         uses: $/.github/actions/component-changes
         with:
           path: backend/
-      - name: Select build path
+      - name: 🧭 Select build path
         id: selection
         env:
           BUILD: ${{ inputs.build || steps.changes.outputs.changed == 'true' || github.event.action == 'opened' || github.event.action == 'reopened' }}
@@ -71,30 +72,31 @@ jobs:
         run: |
           echo "build=$BUILD" >> "$GITHUB_OUTPUT"
           echo "BUILD_REQUESTED=$BUILD" >> "$GITHUB_ENV"
-      - uses: astral-sh/setup-uv@v10.3.2
+      - name: ⚙️ Set up uv and Python
+        uses: astral-sh/setup-uv@v10.3.2
         if: steps.selection.outputs.build == 'true'
         with:
           working-directory: backend
           enable-cache: true
           cache-python: true
           activate-environment: true
-      - name: Install backend dependencies
+      - name: 📦 Install backend dependencies
         if: steps.selection.outputs.build == 'true'
         # language=bash
         run: uv sync --directory backend --locked
-      - name: Lint
+      - name: 🧹 Lint
         id: lint
         if: steps.selection.outputs.build == 'true'
         continue-on-error: true
         # language=bash
         run: uv run --directory backend --locked ruff check --output-format=github
-      - name: Format
+      - name: 🎨 Check formatting
         id: format
         if: steps.selection.outputs.build == 'true'
         continue-on-error: true
         # language=bash
         run: uv run --directory backend --locked ruff format --check --output-format=github
-      - name: Tests with GitHub annotations
+      - name: 🧪 Run tests
         id: tests
         if: steps.selection.outputs.build == 'true'
         continue-on-error: true
@@ -102,13 +104,13 @@ jobs:
           PYTEST_RUN_PATH: backend
         # language=bash
         run: uv run --directory backend --locked pytest -q
-      - name: Fail after all selected checks
+      - name: ❌ Report validation failure
         if: contains(steps.*.outcome, 'failure')
         # language=bash
         run: |
           echo "::error::Backend validation failed."
           exit 1
-      - name: Ensure backend deployment
+      - name: 🚀 Ensure deployment
         id: deploy
         uses: $/.github/actions/vercel-prebuilt-deploy
         env:

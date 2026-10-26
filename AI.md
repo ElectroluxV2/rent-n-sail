@@ -1,5 +1,11 @@
 # AI usage docs
 
+## 2026-10-26 — Consistent step emojis and deployment debug cleanup
+
+- AI assistance: OpenCode (GPT-6.1 Sol) added explicit emoji-prefixed names to every configured workflow/composite step, using consistent prefixes for matching purposes across database/backend/frontend jobs and shared actions. Author attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`). Job display names, IDs, dependencies, and the minimal detector script are unchanged.
+- Removed the deployment verification step and its unused HTTP/CORS/SSR probes, runtime-log diagnostics, and related debug-only tests. Retained normal lint/format/application/migration/CI-script tests, provider READY checks, artifact provenance validation, credential redaction, and deployment summaries. Added regressions for custom step names, emoji consistency, and absence of deployment debug steps; updated CI documentation.
+- Validation: all 50 configured steps have custom emoji-prefixed names; 32 Bash checks, ShellCheck, actionlint (with the documented syntax/runner-label exceptions), action-lock verification, formatting, and diff checks passed.
+
 ## 2026-10-26 — Explicit Ubuntu 26.04 runners
 
 - AI assistance: OpenCode (GPT-6.1 Sol) pinned the database/backend/frontend reusable jobs to `runs-on: ubuntu-26.04`, replacing `ubuntu-latest` to avoid the Ubuntu label-migration notices. Confirmed the hosted-runner label against GitHub's runner-images documentation. Author attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`). No other workflow behavior changed.

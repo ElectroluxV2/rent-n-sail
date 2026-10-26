@@ -188,25 +188,34 @@ ln -s / "$TEMP/restored/functions/app.func/link"
 tar -czf "$TEMP/unsafe.tar.gz" -C "$TEMP/restored" functions
 expect_failure restore_output "$TEMP/unsafe.tar.gz" "$TEMP/unsafe" backend; pass 'unsafe archive members are rejected before extraction'
 
-printf '<script id="ng-state" type="application/json">{"backend-api-url":"https://backend.test/","123":{"s":200,"u":"https://backend.test/","b":{"Hello":"World"}}}</script>' > "$TEMP/ssr.html"
-verify_ssr_state "$TEMP/ssr.html" https://backend.test
-pass 'actual HTTP response state is required for SSR success'
-printf '<script id="ng-state" type="application/json">{"backend-api-url":"https://backend.test/"}</script>' > "$TEMP/ssr.html"
-expect_failure verify_ssr_state "$TEMP/ssr.html" https://backend.test; pass 'transferring only the URL is rejected'
-[[ $(printf '%s\n' '{"data":{"logs":[{"message":"nested error"}]}}' | jq -r '(.data // .) | (.logs // [.])[] | .message // empty') == 'nested error' ]]
-pass 'nested Vercel runtime messages are read'
 [[ $(sanitize 'token-fixture postgresql://user:password@host/db') != *token-fixture* ]]
 [[ $(sanitize 'postgresql://user:password@host/db') != *password* ]]
-pass 'runtime diagnostics redact tokens and database URLs'
+pass 'provider logs redact tokens and database URLs'
 
 [[ $(grep -l 'uses: \$/\.github/actions/component-changes' "$ROOT"/.github/workflows/reusable-*.yml | wc -l | tr -d ' ') == 3 ]]
 [[ $(awk '/^jobs:/{jobs=1;next} jobs && /^  [a-z]+:/{print $1}' "$ROOT/.github/workflows/automatic.yml" | tr '\n' ' ') == 'database: backend: frontend: ' ]]
 if grep -qE 'uses:.*reusable-(database|backend|frontend)' "$ROOT"/.github/workflows/reusable-*.yml; then die 'Nested application workflow call found.'; fi
 if grep -R -nE 'python3|ci/deploy\.py|unittest' "$ROOT/.github"; then die 'Python CI/CD glue found.'; fi
 pass 'three detector calls, exactly three automatic jobs, no nested workflows or Python glue'
-for step in 'Set up cached Vercel CLI' 'Verify live application and dependency wiring'; do
-  condition=$(awk -v name="$step" 'index($0,"- name: " name) {getline; print}' "$ROOT/.github/actions/vercel-prebuilt-deploy/action.yml")
-  [[ "$condition" == "      if: steps.resolve.outputs.mode != 'reuse'" ]]
+condition=$(awk '/- name: ⚙️ Set up Vercel CLI/ {getline; print}' "$ROOT/.github/actions/vercel-prebuilt-deploy/action.yml")
+[[ "$condition" == "      if: steps.resolve.outputs.mode != 'reuse'" ]]
+pass 'reuse skips deployment toolchain setup'
+if grep -R -nE 'ci/deploy\.sh smoke|name:.*([Vv]erify|[Dd]ebug|[Dd]iagnostics)' "$ROOT/.github"; then die 'Debug deployment step found.'; fi
+if grep -nE '^(header_value|verify_ssr_state|runtime_diagnostics|verify_browser_wiring|smoke)\(\)' "$ROOT/ci/deploy.sh"; then die 'Unused deployment debugging code found.'; fi
+pass 'deployment verification/debug steps and their unused implementation are removed'
+if grep -R -nE --include='*.yml' --include='*.yaml' '^[[:space:]]*- (uses|run|id|if|shell|env|with):' "$ROOT/.github"; then die 'A configured step has no custom name.'; fi
+names=$(grep -RhE --include='*.yml' --include='*.yaml' '^[[:space:]]*- name:' "$ROOT/.github" | sed 's/^[[:space:]]*- name: //')
+while IFS= read -r name; do
+  case "$name" in
+    '📥 '*|'📤 '*|'🔍 '*|'🧭 '*|'⚙️ '*|'📦 '*|'🗜️ '*|'🧹 '*|'🎨 '*|'🧪 '*|'🔨 '*|'🌱 '*|'🔗 '*|'🔐 '*|'🚀 '*|'📝 '*|'❌ '*) ;;
+    *) die "Step name has no purpose emoji: $name" ;;
+  esac
+done <<< "$names"
+pass 'every configured workflow/composite step has an emoji-prefixed custom name'
+for workflow in backend frontend; do
+  for name in '📥 Checkout source' '🧭 Select build path' '🧹 Lint' '🎨 Check formatting' '🧪 Run tests' '❌ Report validation failure' '🚀 Ensure deployment'; do
+    grep -Fq -- "- name: $name" "$ROOT/.github/workflows/reusable-$workflow.yml"
+  done
 done
-pass 'reuse skips deployment toolchain setup and deployment smoke tests'
+pass 'matching application step purposes use identical emoji and labels'
 printf '%s Bash CI/CD checks passed.\n' "$passed"
