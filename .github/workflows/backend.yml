@@ -41,8 +41,8 @@ jobs:
         run: uv sync --locked
         
       - name: Lint (Ruff)
+        if: always()
         uses: astral-sh/ruff-action@v4.1.0
-        continue-on-error: true
         with:
           src: backend
           version-file: backend/uv.lock
@@ -50,22 +50,22 @@ jobs:
           args: check --output-format=github
 
       - name: Format (Ruff)
+        if: always()
         uses: astral-sh/ruff-action@v4.1.0
-        continue-on-error: true
         with:
           src: backend
           version-file: backend/uv.lock
           # language=bash
           args: format --check --output-format=github
-
-      - name: Run Unit Tests (Pytest)
-        continue-on-error: true
-        # language=bash
-        run: uv run --directory backend --locked pytest -q
-
-      - name: Fail if lint, formatting or tests failed
-        if: contains(steps.*.outcome, 'failure')
+          
+      - name: List workspace contents
+        if: always()
         # language=bash
         run: |
-          echo "::error::Backend validation failed."
-          exit 1
+          pwd
+          ls -la
+
+      - name: Run Unit Tests (Pytest)
+        if: always()
+        # language=bash
+        run: uv run --directory backend --locked pytest -q

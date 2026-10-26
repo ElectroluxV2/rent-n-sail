@@ -37,28 +37,21 @@ jobs:
           cache: true
 
       - name: Lint (Angular ESLint)
+        if: always()
         # language=bash
         run: pnpm exec eslint . --format gha
-        continue-on-error: true
       
       - name: Check formatting
+        if: always()
         uses: oxc-project/oxfmt-action@v0.0.1
-        continue-on-error: true
         with:
           working-directory: frontend
 
       - name: Run Unit Tests (Vitest)
-        continue-on-error: true
+        if: always()
         # language=bash
         run: pnpm exec ng test --no-watch --no-progress --reporters=github-actions   
 
       - name: Angular
         # language=bash
         run: pnpm exec ng build
-
-      - name: Fail if lint, formatting or tests failed
-        if: contains(steps.*.outcome, 'failure')
-        # language=bash
-        run: |
-          echo "::error::Frontend validation failed."
-          exit 1
