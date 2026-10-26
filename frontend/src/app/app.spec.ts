@@ -25,21 +25,21 @@ describe('App', () => {
     const http = TestBed.inject(HttpTestingController);
     fixture.detectChanges();
 
-    http.expectOne('https://frontend.test/api').flush({ Hello: 'World' });
+    http.expectOne('https://frontend.test/api/health').flush({ result: 'ok' });
     await fixture.whenStable();
     fixture.detectChanges();
 
     const element = fixture.nativeElement as HTMLElement;
-    expect(element.textContent).toContain('Backend says: World');
+    expect(element.textContent).toContain('Backend says: ok');
 
     element
       .querySelector('form')
       ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     fixture.detectChanges();
-    http.expectOne('https://frontend.test/api').flush({ Hello: 'World again' });
+    http.expectOne('https://frontend.test/api/health').flush({ result: 'ok' });
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(element.textContent).toContain('Backend says: World again');
+    expect(element.textContent).toContain('Backend says: ok');
   });
 });
