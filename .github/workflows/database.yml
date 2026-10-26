@@ -15,6 +15,7 @@ concurrency:
   queue: max
 jobs:
   database:
+    name: Database
     uses: ./.github/workflows/reusable-database.yml
     with:
       build: true

@@ -19,6 +19,7 @@ concurrency:
   queue: max
 jobs:
   backend:
+    name: Backend
     uses: ./.github/workflows/reusable-backend.yml
     with:
       branch: ${{ github.ref_name }}

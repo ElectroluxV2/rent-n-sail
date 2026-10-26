@@ -19,6 +19,7 @@ concurrency:
   queue: max
 jobs:
   frontend:
+    name: Frontend
     uses: ./.github/workflows/reusable-frontend.yml
     with:
       branch: ${{ github.ref_name }}
