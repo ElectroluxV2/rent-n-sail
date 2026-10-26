@@ -10,7 +10,7 @@
 
 ## Local development
 
-Portless is installed with the frontend development dependencies. From `frontend`, start the services in separate terminals:
+Portless is installed with the frontend development dependencies. Copy the root `.env.example` to `.env.local` once, then start the services from `frontend` in separate terminals:
 
 ```bash
 pnpm run start:backend
@@ -18,6 +18,8 @@ pnpm start
 ```
 
 Use `https://frontend.localhost` and `https://backend.localhost`. The first interactive run may ask to trust the local CA and bind port 443. See [frontend/README.md](frontend/README.md#development-server) for configuration overrides.
+
+To exercise the sample inventory, set `DATABASE_URL` in `.env.local` to a direct Neon development/preview connection, apply the [database migrations](database/README.md), then request `/api/boats`. Production deployments resolve pooled credentials separately. Never commit connection strings.
 
 ## Formatting
 

@@ -17,10 +17,6 @@ const serverConfig: ApplicationConfig = {
         }
 
         const url = new URL('/api', backendUrl);
-        if (url.username || url.password) {
-          throw new Error('BACKEND_URL must not contain credentials.');
-        }
-
         inject(TransferState).set(BACKEND_API_URL_STATE_KEY, url.href);
         return url.href;
       },

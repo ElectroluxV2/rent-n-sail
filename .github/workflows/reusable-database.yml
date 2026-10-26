@@ -1,0 +1,111 @@
+name: Reusable database CI/CD
+on:
+  workflow_call:
+    inputs:
+      branch:
+        type: string
+        required: true
+      target:
+        type: string
+        default: preview
+    secrets:
+      NEON_API_KEY:
+        required: false
+      NEON_PROJECT_ID:
+        required: false
+    outputs:
+      branch_id:
+        description: Non-secret Neon branch reference; credentials never cross job outputs.
+        value: ${{ jobs.database.outputs.branch_id }}
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  database:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: database-${{ inputs.target == 'production' && 'production' || inputs.branch }}
+      cancel-in-progress: false
+      queue: max
+    environment:
+      name: database-${{ inputs.target == 'production' && 'production' || inputs.branch }}
+    outputs:
+      branch_id: ${{ steps.reference.outputs.branch_id }}
+    env:
+      DEPLOY_BRANCH: ${{ inputs.branch }}
+      DEPLOY_TARGET: ${{ inputs.target }}
+      NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID || secrets.NEON_PROJECT_ID }}
+      NEON_PARENT_BRANCH_ID: ${{ vars.NEON_PARENT_BRANCH_ID }}
+      NEON_DATABASE_NAME: ${{ vars.NEON_DATABASE_NAME || 'neondb' }}
+      NEON_ROLE_NAME: ${{ vars.NEON_ROLE_NAME || 'neondb_owner' }}
+      UV_PYTHON_PREFERENCE: only-managed
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Resolve production parent
+        id: plan
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        # language=bash
+        run: python3 ci/deploy.py database-plan
+      - name: Ensure copy-on-write preview branch
+        id: branch
+        if: inputs.target == 'preview'
+        uses: neondatabase/create-branch-action@6.3.1
+        with:
+          api_key: ${{ secrets.NEON_API_KEY }}
+          project_id: ${{ env.NEON_PROJECT_ID }}
+          parent_branch: ${{ steps.plan.outputs.parent_branch_id }}
+          branch_name: ${{ steps.plan.outputs.branch_name }}
+          database: ${{ env.NEON_DATABASE_NAME }}
+          role: ${{ env.NEON_ROLE_NAME }}
+          suspend_timeout: 300
+      - name: Select database reference
+        id: reference
+        env:
+          NEON_BRANCH_ID: ${{ inputs.target == 'preview' && steps.branch.outputs.branch_id || steps.plan.outputs.parent_branch_id }}
+        # language=bash
+        run: echo "branch_id=$NEON_BRANCH_ID" >> "$GITHUB_OUTPUT"
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          working-directory: database
+          enable-cache: true
+          cache-python: true
+          activate-environment: true
+      - name: Install migration tools
+        # language=bash
+        run: uv sync --directory database --locked
+      - name: Test migrations
+        env:
+          PYTEST_RUN_PATH: database
+        # language=bash
+        run: uv run --directory database --locked pytest -q
+      - name: Resolve direct migration credentials privately
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_BRANCH_ID: ${{ steps.reference.outputs.branch_id }}
+        # language=bash
+        run: python3 ci/deploy.py database-env
+      - name: Migrate selected database
+        # language=bash
+        run: uv run --directory database --locked alembic upgrade head
+      - name: Comment schema changes on the PR
+        if: github.event_name == 'pull_request' && inputs.target == 'preview'
+        uses: neondatabase/schema-diff-action@v1.0.1
+        with:
+          api_key: ${{ secrets.NEON_API_KEY }}
+          project_id: ${{ env.NEON_PROJECT_ID }}
+          base_branch: ${{ steps.plan.outputs.parent_branch_id }}
+          compare_branch: ${{ steps.reference.outputs.branch_id }}
+          database: ${{ env.NEON_DATABASE_NAME }}
+      - name: Database summary
+        env:
+          NEON_BRANCH_ID: ${{ steps.reference.outputs.branch_id }}
+        # language=bash
+        run: |
+          {
+            echo "## Database deployment"
+            echo "Neon branch: $NEON_BRANCH_ID"
+            echo "Migrations: Alembic upgrade head completed."
+          } >> "$GITHUB_STEP_SUMMARY"

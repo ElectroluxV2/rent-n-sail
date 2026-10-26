@@ -14,7 +14,6 @@ class CorsTests(unittest.TestCase):
                 os.environ,
                 {
                     "CORS_ALLOWED_ORIGINS": "https://frontend.test, https://second.test",
-                    "CORS_ALLOWED_ORIGIN_REGEX": r"https://preview-[a-z0-9-]+\.frontend\.test",
                 },
             )
         )
@@ -25,7 +24,6 @@ class CorsTests(unittest.TestCase):
         for origin in (
             "https://frontend.test",
             "https://second.test",
-            "https://preview-feature.frontend.test",
         ):
             with self.subTest(origin=origin):
                 response = self.client.get("/api", headers={"Origin": origin})
@@ -40,8 +38,9 @@ class CorsTests(unittest.TestCase):
     def test_origins_not_configured_in_environment_are_not_allowed(self):
         for origin in (
             "https://unconfigured.test",
+            "https://preview-feature.frontend.test",
             "https://preview-feature.another.test",
-            "https://preview-feature.frontend.test.evil.test",
+            "https://frontend.test.evil.test",
         ):
             with self.subTest(origin=origin):
                 response = self.client.get("/api", headers={"Origin": origin})

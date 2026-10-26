@@ -1,5 +1,22 @@
 # AI usage docs
 
+## 2026-10-26 — Approved ordered CI/CD and sample database implementation
+
+- AI assistance: OpenCode (GPT-6.1 Sol) resumed the approved workflow redesign: three reusable workflows plus database/backend/frontend manual entry points and one ordered automatic entry point, native path planning, per-target concurrency, stable URLs, and runtime dependency wiring.
+- Author attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- Added SQLAlchemy models and an Alembic sample inventory migration following Neon's Python/FastAPI migration guide, direct migration versus pooled application credentials, explicit Neon copy-on-write branch preparation, and the official Neon schema-diff PR comment action. Remote creation requires the repository's Neon API key and project configuration.
+- Verified that the public Vercel create-deployment API documents a new build for `deploymentId`, not a zero-build preview clone. Retained sanitized GitHub prebuilt-output artifacts as the fallback for unchanged applications rather than silently rebuilding; no OCI registry. Runtime credentials are stripped before upload, applied only after upload/restoration, and never cross job outputs. Added policy, artifact safety, migration, and sample backend tests.
+- Fixed frontend client-rendered startup by loading public runtime configuration before Angular resolves its backend URL, while preserving SSR transfer state. Folded in pending fourth-round changes: no API discovery stub, explicit-only CORS, annotated pytest, and shell-independent Portless commands using native `PORT` support.
+- Progress, provider constraints, required secret names, and final status are reported on PR #14 only, as requested.
+- Local validation: 17 deployment/artifact policy tests, five backend tests (plus CORS subtests), four Angular tests, the Alembic migration lifecycle test, Node.js 24 packaging/SSR checks, and native Portless startup checks passed. Regenerated both Python lockfiles with the documented uv 0.13.5 version and verified all seven action-lock entries/workflows. The user added Neon credentials; the project ID is accepted as either a repository variable or secret.
+
+## 2026-10-26 — PR #14 fourth-round work and workflow redesign proposal
+
+- AI assistance: OpenCode (GPT-6.1 Sol) assessed the fourth-round review feedback and prepared local changes for explicit CORS allowlists, annotated pytest reporting, shell-independent Portless commands, and direct Vercel Build Output packaging without an API stub. The user selected the existing Vercel–Neon integration for preview database management.
+- Author attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- The fifth-round request asked for a workflow design before implementation. Posted the proposed three reusable workflows and four entry workflows, with Mermaid diagrams, dependency resolution, selective builds, runtime frontend configuration, and provider constraints in [the PR discussion](https://github.com/Renters-Sailors/rent-n-sail/pull/14#issuecomment-6423310377).
+- Implementation is paused pending design feedback. The fourth-round changes remain local and unpushed; further discussion stays on GitHub as requested.
+
 ## 2026-10-26 — PR #14 third review round
 
 - AI assistance: OpenCode (GPT-6.1 Sol) assessed the 11 third-round review threads on [PR #14](https://github.com/Renters-Sailors/rent-n-sail/pull/14) and simplified the configuration, tests, and workflow failure checks.

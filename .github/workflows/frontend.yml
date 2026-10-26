@@ -1,95 +1,27 @@
-name: Frontend CI
-
+name: Manual frontend CI/CD
 on:
-  push:
-    branches:
-      - main
-    paths: &paths
-      - "frontend/**"
-      - ".github/workflows/frontend.yml"
-      - ".github/workflows/actions.lock"
-      - ".github/actions/vercel-prebuilt-deploy/**"
-      - ".github/actions/setup-vercel-cli/**"
-  pull_request:
-    paths: *paths
   workflow_dispatch:
-
+    inputs:
+      target:
+        type: choice
+        options: [preview, production]
+        default: preview
+      build:
+        type: boolean
+        default: true
 permissions:
   contents: read
-
+  actions: read
+  pull-requests: write
 concurrency:
-  group: frontend-${{ github.ref == 'refs/heads/main' && 'production' || format('preview-{0}', github.event.pull_request.number || github.ref_name) }}
+  group: stack-${{ inputs.target == 'production' && 'production' || github.ref_name }}
   cancel-in-progress: false
   queue: max
-
-env:
-  PNPM_CONFIG_COLOR: always
-  FORCE_COLOR: "1"
-  VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
-  VERCEL_PROJECT_ID: ${{ vars.VERCEL_FRONTEND_PROJECT_ID }}
-  VERCEL_ENVIRONMENT: ${{ github.ref == 'refs/heads/main' && 'production' || 'preview' }}
-  VERCEL_LOCAL_CONFIG: frontend/vercel.json
-
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    environment:
-      name: frontend-${{ github.ref == 'refs/heads/main' && 'production' || format('preview-{0}', github.event.pull_request.number || github.ref_name) }}
-      url: ${{ steps.deploy.outputs.url }}
-
-    defaults:
-      run:
-        working-directory: frontend
-    
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7.0.1
-        with:
-          fetch-depth: 0
-          filter: tree:0
-          persist-credentials: false
-
-      - name: Set up pnpm with GitHub Actions cache
-        uses: pnpm/setup@v3.1.1
-        with:
-          working-directory: frontend
-          cache: true
-
-      - name: Lint (Angular ESLint)
-        id: lint
-        # language=bash
-        run: pnpm exec eslint . --format gha
-        continue-on-error: true
-      
-      - name: Check formatting
-        id: format
-        uses: oxc-project/oxfmt-action@v0.0.1
-        continue-on-error: true
-        with:
-          working-directory: frontend
-
-      - name: Angular tests
-        id: tests
-        continue-on-error: true
-        # language=bash
-        run: pnpm exec ng test --watch=false --reporters=default --reporters=github-actions
-
-      - name: Angular build
-        id: build
-        continue-on-error: true
-        # language=bash
-        run: pnpm exec ng build
-
-      - name: Fail if any frontend check failed
-        if: contains(steps.*.outcome, 'failure')
-        # language=bash
-        run: |
-          echo "::error title=Frontend checks failed::One or more frontend checks failed. See their annotations and logs."
-          exit 1
-
-      - name: Build and deploy frontend with Vercel
-        id: deploy
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        uses: $/.github/actions/vercel-prebuilt-deploy
+  frontend:
+    uses: ./.github/workflows/reusable-frontend.yml
+    with:
+      branch: ${{ github.ref_name }}
+      target: ${{ inputs.target }}
+      build: ${{ inputs.build }}
+    secrets: inherit

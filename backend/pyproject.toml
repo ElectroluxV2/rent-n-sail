@@ -4,9 +4,13 @@ version = "0.1.0"
 requires-python = "==3.14.*"
 dependencies = [
     "fastapi[standard]>=0.162.0",
+    "psycopg[binary]>=3.2.0",
+    "sqlalchemy>=2.0.33",
 ]
 
 [dependency-groups]
 dev = [
+    "pytest>=9.1.1",
+    "pytest-github-actions-annotate-failures>=0.4.2",
     "ruff>=0.17.2",
 ]

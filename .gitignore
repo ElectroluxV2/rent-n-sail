@@ -2,9 +2,12 @@
 .idea
 .vercel
 .env*
+!/.env.example
 
-# Python bytecode
-/backend/**/__pycache__/
+# Python bytecode and isolated environments
+__pycache__/
+.venv/
+.pytest_cache/
 
 # Frontend compiled output and dependencies
 /frontend/dist

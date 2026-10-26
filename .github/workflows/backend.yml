@@ -1,105 +1,27 @@
-name: Backend CI
-
+name: Manual backend CI/CD
 on:
-  push:
-    branches:
-      - main
-    paths: &paths
-      - "backend/**"
-      - "frontend/package.json"
-      - "vercel.json"
-      - ".github/workflows/backend.yml"
-      - ".github/workflows/actions.lock"
-      - ".github/actions/vercel-prebuilt-deploy/**"
-      - ".github/actions/setup-vercel-cli/**"
-  pull_request:
-    paths: *paths
   workflow_dispatch:
-
+    inputs:
+      target:
+        type: choice
+        options: [preview, production]
+        default: preview
+      build:
+        type: boolean
+        default: true
 permissions:
   contents: read
-
+  actions: read
+  pull-requests: write
 concurrency:
-  group: backend-${{ github.ref == 'refs/heads/main' && 'production' || format('preview-{0}', github.event.pull_request.number || github.ref_name) }}
+  group: stack-${{ inputs.target == 'production' && 'production' || github.ref_name }}
   cancel-in-progress: false
   queue: max
-
-env:
-  PNPM_CONFIG_COLOR: always
-  FORCE_COLOR: "1"
-  VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
-  VERCEL_PROJECT_ID: ${{ vars.VERCEL_BACKEND_PROJECT_ID }}
-  UV_PYTHON_PREFERENCE: only-managed
-  VERCEL_ENVIRONMENT: ${{ github.ref == 'refs/heads/main' && 'production' || 'preview' }}
-  VERCEL_LOCAL_CONFIG: vercel.json
-
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    environment:
-      name: backend-${{ github.ref == 'refs/heads/main' && 'production' || format('preview-{0}', github.event.pull_request.number || github.ref_name) }}
-      url: ${{ steps.deploy.outputs.url }}
-
-    defaults:
-      run:
-        working-directory: backend
-        
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7.0.1
-        with:
-          fetch-depth: 0
-          filter: tree:0
-          persist-credentials: false
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v10.3.2
-        with:
-          working-directory: backend
-          enable-cache: true
-          cache-python: true
-          activate-environment: true
-
-      - name: Install dependencies
-        # language=bash
-        run: uv sync --locked
-        
-      - name: Lint (Ruff)
-        id: ruff_lint
-        uses: astral-sh/ruff-action@v4.1.0
-        continue-on-error: true
-        with:
-          src: backend
-          version-file: backend/uv.lock
-          # language=bash
-          args: check --output-format=github
-
-      - name: Format (Ruff)
-        id: ruff_format
-        uses: astral-sh/ruff-action@v4.1.0
-        continue-on-error: true
-        with:
-          src: backend
-          version-file: backend/uv.lock
-          # language=bash
-          args: format --check --output-format=github
-
-      - name: Backend tests
-        id: tests
-        continue-on-error: true
-        # language=bash
-        run: uv run --locked python -m unittest discover -v
-
-      - name: Fail if any backend check failed
-        if: contains(steps.*.outcome, 'failure')
-        # language=bash
-        run: |
-          echo "::error title=Backend checks failed::One or more backend checks failed. See their annotations and logs."
-          exit 1
-
-      - name: Build and deploy backend with Vercel
-        id: deploy
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        uses: $/.github/actions/vercel-prebuilt-deploy
+  backend:
+    uses: ./.github/workflows/reusable-backend.yml
+    with:
+      branch: ${{ github.ref_name }}
+      target: ${{ inputs.target }}
+      build: ${{ inputs.build }}
+    secrets: inherit

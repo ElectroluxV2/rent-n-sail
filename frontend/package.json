@@ -4,9 +4,10 @@
   "private": true,
   "scripts": {
     "ng": "ng",
-    "start": "BACKEND_URL=${BACKEND_URL:-https://backend.localhost} portless frontend ng serve",
-    "start:backend": "CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-https://frontend.localhost} portless backend sh -c 'uv run --directory ../backend fastapi dev --port \"$PORT\"'",
+    "start": "node --env-file=../.env.local node_modules/portless/dist/cli.js frontend ng serve",
+    "start:backend": "node --env-file=../.env.local node_modules/portless/dist/cli.js backend uv run --directory ../backend fastapi dev",
     "build": "ng build",
+    "build:vercel": "node scripts/build-vercel.mjs",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "lint": "eslint .",

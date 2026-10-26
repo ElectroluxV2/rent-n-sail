@@ -1,0 +1,112 @@
+name: Reusable frontend CI/CD
+on:
+  workflow_call:
+    inputs:
+      branch:
+        type: string
+        required: true
+      target:
+        type: string
+        default: preview
+      build:
+        type: boolean
+        default: true
+      backend_url:
+        type: string
+        default: ""
+    secrets:
+      VERCEL_TOKEN:
+        required: false
+      NEON_API_KEY:
+        required: false
+      NEON_PROJECT_ID:
+        required: false
+    outputs:
+      url:
+        value: ${{ jobs.frontend.outputs.url }}
+permissions:
+  contents: read
+  actions: read
+  pull-requests: write
+jobs:
+  backend:
+    if: inputs.backend_url == ''
+    uses: ./.github/workflows/reusable-backend.yml
+    with:
+      branch: ${{ inputs.branch }}
+      target: ${{ inputs.target }}
+      build: false
+    secrets: inherit
+  frontend:
+    needs: backend
+    if: ${{ !cancelled() && !failure() }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: frontend-${{ inputs.target == 'production' && 'production' || inputs.branch }}
+      cancel-in-progress: false
+      queue: max
+    environment:
+      name: frontend-${{ inputs.target == 'production' && 'production' || inputs.branch }}
+      url: ${{ steps.deploy.outputs.url }}
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+    env:
+      COMPONENT: frontend
+      DEPLOY_BRANCH: ${{ inputs.branch }}
+      DEPLOY_TARGET: ${{ inputs.target }}
+      BUILD_REQUESTED: ${{ inputs.build }}
+      BACKEND_URL: ${{ inputs.backend_url || needs.backend.outputs.url }}
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_FRONTEND_PROJECT_ID: ${{ vars.VERCEL_FRONTEND_PROJECT_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_FRONTEND_PROJECT_ID }}
+      VERCEL_LOCAL_CONFIG: frontend/vercel.json
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/setup@v3.1.1
+        if: inputs.build
+        with:
+          working-directory: frontend
+          cache: true
+      - name: Lint
+        id: lint
+        if: inputs.build
+        continue-on-error: true
+        working-directory: frontend
+        # language=bash
+        run: pnpm exec eslint . --format gha
+      - name: Format
+        id: format
+        if: inputs.build
+        continue-on-error: true
+        uses: oxc-project/oxfmt-action@v0.0.1
+        with:
+          working-directory: frontend
+      - name: Tests with GitHub annotations
+        id: tests
+        if: inputs.build
+        continue-on-error: true
+        working-directory: frontend
+        # language=bash
+        run: pnpm exec ng test --watch=false --reporters=default --reporters=github-actions
+      - name: Production build
+        id: build
+        if: inputs.build
+        continue-on-error: true
+        working-directory: frontend
+        # language=bash
+        run: pnpm exec ng build
+      - name: Fail after all selected checks
+        if: contains(steps.*.outcome, 'failure')
+        # language=bash
+        run: |
+          echo "::error::Frontend validation failed."
+          exit 1
+      - name: Ensure frontend deployment
+        id: deploy
+        uses: $/.github/actions/vercel-prebuilt-deploy
+        env:
+          RNS_FRONTEND_BUILD_READY: ${{ inputs.build }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}

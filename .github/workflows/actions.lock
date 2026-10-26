@@ -3,15 +3,26 @@
 # Docs: https://gh.io/actions-lockfile
 version: 'v0.0.3'
 workflows:
-    '.github/workflows/backend.yml':
+    '.github/workflows/automatic.yml':
+        - 'actions/checkout@v7.0.1'
+    '.github/workflows/backend.yml': []
+    '.github/workflows/database.yml': []
+    '.github/workflows/frontend.yml': []
+    '.github/workflows/reusable-backend.yml':
         - 'actions/cache@v6.1.0'
         - 'actions/checkout@v7.0.1'
-        - 'astral-sh/ruff-action@v4.1.0'
+        - 'actions/upload-artifact@v7.0.2'
         - 'astral-sh/setup-uv@v10.3.2'
         - 'pnpm/setup@v3.1.1'
-    '.github/workflows/frontend.yml':
+    '.github/workflows/reusable-database.yml':
+        - 'actions/checkout@v7.0.1'
+        - 'astral-sh/setup-uv@v10.3.2'
+        - 'neondatabase/create-branch-action@6.3.1'
+        - 'neondatabase/schema-diff-action@v1.0.1'
+    '.github/workflows/reusable-frontend.yml':
         - 'actions/cache@v6.1.0'
         - 'actions/checkout@v7.0.1'
+        - 'actions/upload-artifact@v7.0.2'
         - 'oxc-project/oxfmt-action@v0.0.1'
         - 'pnpm/setup@v3.1.1'
 dependencies:
@@ -25,16 +36,26 @@ dependencies:
         commit: 'sha1-3d3c42e5aac5ba805825da76410c181273ba90b1'
         owner_id: 44036562
         repo_id: 197814629
-    'astral-sh/ruff-action@v4.1.0':
-        ref: 'v4.1.0'
-        commit: 'sha1-278981a28ce3188b1e39527901f38254bf3aac89'
-        owner_id: 115962839
-        repo_id: 865075538
+    'actions/upload-artifact@v7.0.2':
+        ref: 'v7.0.2'
+        commit: 'sha1-cf430e030ddbb5b0abf93d22962f4752f3646cd9'
+        owner_id: 44036562
+        repo_id: 192625955
     'astral-sh/setup-uv@v10.3.2':
         ref: 'v10.3.2'
         commit: 'sha1-07a047e608db84b3d8c06cd9a7c7dcc9c355c18e'
         owner_id: 115962839
         repo_id: 846733598
+    'neondatabase/create-branch-action@6.3.1':
+        ref: '6.3.1'
+        commit: 'sha1-fb620d43d4c565abaf088b848a4e28e5c4ea4d9c'
+        owner_id: 77690634
+        repo_id: 564335572
+    'neondatabase/schema-diff-action@v1.0.1':
+        ref: 'v1.0.1'
+        commit: 'sha1-80cfa8521628e890015b60f5291a7738926617dc'
+        owner_id: 77690634
+        repo_id: 887782459
     'oxc-project/oxfmt-action@v0.0.1':
         ref: 'v0.0.1'
         commit: 'sha1-5f25fc2dccfa7335bc29ceceecc610d8b5c93d64'

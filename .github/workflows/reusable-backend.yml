@@ -1,0 +1,114 @@
+name: Reusable backend CI/CD
+on:
+  workflow_call:
+    inputs:
+      branch:
+        type: string
+        required: true
+      target:
+        type: string
+        default: preview
+      build:
+        type: boolean
+        default: true
+      database_branch_id:
+        type: string
+        default: ""
+    secrets:
+      VERCEL_TOKEN:
+        required: false
+      NEON_API_KEY:
+        required: false
+      NEON_PROJECT_ID:
+        required: false
+    outputs:
+      url:
+        value: ${{ jobs.backend.outputs.url }}
+permissions:
+  contents: read
+  actions: read
+  pull-requests: write
+jobs:
+  database:
+    if: inputs.database_branch_id == ''
+    uses: ./.github/workflows/reusable-database.yml
+    with:
+      branch: ${{ inputs.branch }}
+      target: ${{ inputs.target }}
+    secrets: inherit
+  backend:
+    needs: database
+    if: ${{ !cancelled() && !failure() }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: backend-${{ inputs.target == 'production' && 'production' || inputs.branch }}
+      cancel-in-progress: false
+      queue: max
+    environment:
+      name: backend-${{ inputs.target == 'production' && 'production' || inputs.branch }}
+      url: ${{ steps.deploy.outputs.url }}
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+    env:
+      COMPONENT: backend
+      DEPLOY_BRANCH: ${{ inputs.branch }}
+      DEPLOY_TARGET: ${{ inputs.target }}
+      BUILD_REQUESTED: ${{ inputs.build }}
+      NEON_BRANCH_ID: ${{ inputs.database_branch_id || needs.database.outputs.branch_id }}
+      NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID || secrets.NEON_PROJECT_ID }}
+      NEON_DATABASE_NAME: ${{ vars.NEON_DATABASE_NAME || 'neondb' }}
+      NEON_ROLE_NAME: ${{ vars.NEON_ROLE_NAME || 'neondb_owner' }}
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_BACKEND_PROJECT_ID: ${{ vars.VERCEL_BACKEND_PROJECT_ID }}
+      VERCEL_FRONTEND_PROJECT_ID: ${{ vars.VERCEL_FRONTEND_PROJECT_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_BACKEND_PROJECT_ID }}
+      VERCEL_LOCAL_CONFIG: vercel.json
+      UV_PYTHON_PREFERENCE: only-managed
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v10.3.2
+        if: inputs.build
+        with:
+          working-directory: backend
+          enable-cache: true
+          cache-python: true
+          activate-environment: true
+      - name: Install backend dependencies
+        if: inputs.build
+        # language=bash
+        run: uv sync --directory backend --locked
+      - name: Lint
+        id: lint
+        if: inputs.build
+        continue-on-error: true
+        # language=bash
+        run: uv run --directory backend --locked ruff check --output-format=github
+      - name: Format
+        id: format
+        if: inputs.build
+        continue-on-error: true
+        # language=bash
+        run: uv run --directory backend --locked ruff format --check --output-format=github
+      - name: Tests with GitHub annotations
+        id: tests
+        if: inputs.build
+        continue-on-error: true
+        env:
+          PYTEST_RUN_PATH: backend
+        # language=bash
+        run: uv run --directory backend --locked pytest -q
+      - name: Fail after all selected checks
+        if: contains(steps.*.outcome, 'failure')
+        # language=bash
+        run: |
+          echo "::error::Backend validation failed."
+          exit 1
+      - name: Ensure backend deployment
+        id: deploy
+        uses: $/.github/actions/vercel-prebuilt-deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}

@@ -1,0 +1,22 @@
+name: Manual database CI/CD
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        type: choice
+        options: [preview, production]
+        default: preview
+permissions:
+  contents: read
+  pull-requests: write
+concurrency:
+  group: stack-${{ inputs.target == 'production' && 'production' || github.ref_name }}
+  cancel-in-progress: false
+  queue: max
+jobs:
+  database:
+    uses: ./.github/workflows/reusable-database.yml
+    with:
+      branch: ${{ github.ref_name }}
+      target: ${{ inputs.target }}
+    secrets: inherit
