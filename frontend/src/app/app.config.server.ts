@@ -16,7 +16,7 @@ const serverConfig: ApplicationConfig = {
           throw new Error('BACKEND_URL must configure the public backend origin.');
         }
 
-        const url = new URL('/api', backendUrl);
+        const url = new URL('/', backendUrl);
         inject(TransferState).set(BACKEND_API_URL_STATE_KEY, url.href);
         return url.href;
       },

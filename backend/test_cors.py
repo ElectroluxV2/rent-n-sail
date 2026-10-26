@@ -26,7 +26,7 @@ class CorsTests(unittest.TestCase):
             "https://second.test",
         ):
             with self.subTest(origin=origin):
-                response = self.client.get("/api", headers={"Origin": origin})
+                response = self.client.get("/", headers={"Origin": origin})
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(response.json(), {"Hello": "World"})
                 self.assertEqual(
@@ -43,13 +43,13 @@ class CorsTests(unittest.TestCase):
             "https://frontend.test.evil.test",
         ):
             with self.subTest(origin=origin):
-                response = self.client.get("/api", headers={"Origin": origin})
+                response = self.client.get("/", headers={"Origin": origin})
                 self.assertNotIn("access-control-allow-origin", response.headers)
 
     def test_preflight_allows_supported_frontend_request(self):
         origin = "https://frontend.test"
         response = self.client.options(
-            "/api",
+            "/",
             headers={
                 "Origin": origin,
                 "Access-Control-Request-Method": "GET",
@@ -61,8 +61,27 @@ class CorsTests(unittest.TestCase):
 
     def test_absent_environment_configuration_does_not_allow_origins(self):
         with patch.dict(os.environ, {}, clear=True), TestClient(create_app()) as client:
-            response = client.get("/api", headers={"Origin": "https://frontend.test"})
+            response = client.get("/", headers={"Origin": "https://frontend.test"})
 
+        self.assertNotIn("access-control-allow-origin", response.headers)
+
+    def test_routes_are_served_without_an_api_prefix(self):
+        response = self.client.get("/health")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"status": "ok"})
+        for path in ("/api", "/api/health", "/api/boats"):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).status_code, 404)
+
+    def test_preflight_rejects_an_unlisted_origin(self):
+        response = self.client.options(
+            "/",
+            headers={
+                "Origin": "https://unconfigured.test",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+        self.assertEqual(response.status_code, 400)
         self.assertNotIn("access-control-allow-origin", response.headers)
 
 

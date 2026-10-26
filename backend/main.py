@@ -9,10 +9,10 @@ from sqlalchemy.orm import Session
 from database import get_session
 from models import Boat
 
-api_router = APIRouter(prefix="/api")
+api_router = APIRouter()
 
 
-@api_router.get("")
+@api_router.get("/")
 def read_root():
     return {"Hello": "World"}
 

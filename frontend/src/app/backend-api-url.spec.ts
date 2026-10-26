@@ -15,13 +15,13 @@ describe('BACKEND_API_URL', () => {
       .fn<typeof fetch>()
       .mockResolvedValue(new Response(JSON.stringify({ backendUrl: 'https://backend.test' })));
     await loadBackendApiUrl(state, fetchConfig);
-    expect(TestBed.inject(BACKEND_API_URL)).toBe('https://backend.test/api');
+    expect(TestBed.inject(BACKEND_API_URL)).toBe('https://backend.test/');
     expect(fetchConfig).toHaveBeenCalledWith('/runtime-config.json', { cache: 'no-store' });
   });
 
   it('does not fetch configuration already supplied by SSR', async () => {
     const state = TestBed.inject(TransferState);
-    state.set(BACKEND_API_URL_STATE_KEY, 'https://backend.test/api');
+    state.set(BACKEND_API_URL_STATE_KEY, 'https://backend.test/');
     const fetchConfig = vi.fn<typeof fetch>();
     await loadBackendApiUrl(state, fetchConfig);
     expect(fetchConfig).not.toHaveBeenCalled();

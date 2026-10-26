@@ -11,7 +11,7 @@ describe('App', () => {
       imports: [App],
       providers: [provideHttpClient(), provideHttpClientTesting()],
     }).compileComponents();
-    TestBed.inject(TransferState).set(BACKEND_API_URL_STATE_KEY, 'https://backend.test/api');
+    TestBed.inject(TransferState).set(BACKEND_API_URL_STATE_KEY, 'https://backend.test/');
   });
 
   afterEach(() => {
@@ -23,7 +23,7 @@ describe('App', () => {
     const http = TestBed.inject(HttpTestingController);
     fixture.detectChanges();
 
-    http.expectOne('https://backend.test/api').flush({ Hello: 'World' });
+    http.expectOne('https://backend.test/').flush({ Hello: 'World' });
     await fixture.whenStable();
     fixture.detectChanges();
 
@@ -34,7 +34,7 @@ describe('App', () => {
       .querySelector('form')
       ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     fixture.detectChanges();
-    http.expectOne('https://backend.test/api').flush({ Hello: 'World again' });
+    http.expectOne('https://backend.test/').flush({ Hello: 'World again' });
     await fixture.whenStable();
     fixture.detectChanges();
 

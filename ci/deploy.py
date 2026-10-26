@@ -14,9 +14,10 @@ import subprocess
 import tarfile
 import tempfile
 import time
+from html.parser import HTMLParser
 from pathlib import Path
 from urllib.error import HTTPError
-from urllib.parse import quote, urlencode
+from urllib.parse import quote, urlencode, urljoin
 from urllib.request import Request, urlopen
 
 ARTIFACT_VERSION = 2
@@ -612,7 +613,7 @@ def runtime_diagnostics(state):
                 [
                     "vercel",
                     "curl",
-                    "https://" + state["alias"] + "/api/health",
+                    "https://" + state["alias"] + "/health",
                     "--",
                     "--fail",
                     "--silent",
@@ -675,8 +676,182 @@ def runtime_diagnostics(state):
         print("Runtime diagnostics timed out; use the Vercel project logs.")
 
 
+class AngularStateParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.collecting = False
+        self.chunks = []
+        self.states = []
+
+    def handle_starttag(self, tag, attributes):
+        attributes = dict(attributes)
+        if (
+            tag == "script"
+            and attributes.get("type") == "application/json"
+            and (attributes.get("id") or "").endswith("-state")
+        ):
+            self.collecting = True
+            self.chunks = []
+
+    def handle_data(self, data):
+        if self.collecting:
+            self.chunks.append(data)
+
+    def handle_endtag(self, tag):
+        if tag == "script" and self.collecting:
+            self.collecting = False
+            try:
+                self.states.append(json.loads("".join(self.chunks)))
+            except ValueError:
+                raise DeploymentError(
+                    "Angular SSR returned invalid transfer-state JSON."
+                ) from None
+
+
+def verify_ssr_state(html, backend_url):
+    parser = AngularStateParser()
+    parser.feed(html)
+    expected = urljoin(backend_url, "/")
+    for state in parser.states:
+        if not isinstance(state, dict) or state.get("backend-api-url") != expected:
+            continue
+        if any(
+            isinstance(value, dict)
+            and value.get("s") == 200
+            and value.get("u") == expected
+            and isinstance(value.get("b"), dict)
+            and isinstance(value["b"].get("Hello"), str)
+            for value in state.values()
+        ):
+            return
+    raise DeploymentError(
+        "Angular SSR did not transfer a successful HttpClient response from the backend root URL."
+    )
+
+
+def verify_browser_wiring(state):
+    origin = state["runtime"]["FRONTEND_URL"]
+    backend = urljoin(state["runtime"]["BACKEND_URL"], "/")
+    # No CLI bypass, cookies, curlrc, or provider credentials: these requests
+    # must exercise the same public API access path as the browser.
+    public_environment = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in {"VERCEL_TOKEN", "NEON_API_KEY", "GITHUB_TOKEN", "GH_TOKEN"}
+    }
+    with tempfile.TemporaryDirectory() as directory:
+        headers = Path(directory) / "headers"
+        for method in ("GET", "OPTIONS"):
+            command = [
+                "curl",
+                "--disable",
+                "--silent",
+                "--show-error",
+                "--max-time",
+                "30",
+                "--request",
+                method,
+                "--header",
+                "Origin: " + origin,
+                "--dump-header",
+                str(headers),
+                "--write-out",
+                "\n%{http_code}",
+                backend,
+            ]
+            if method == "OPTIONS":
+                command += [
+                    "--header",
+                    "Access-Control-Request-Method: GET",
+                    "--header",
+                    "Access-Control-Request-Headers: Content-Type",
+                ]
+            response = subprocess.run(
+                command,
+                env=public_environment,
+                text=True,
+                capture_output=True,
+                timeout=35,
+            )
+            body, _, status = response.stdout.rpartition("\n")
+            values = (
+                {
+                    line.partition(":")[0].lower(): line.partition(":")[2].strip()
+                    for line in headers.read_text().splitlines()
+                    if ":" in line
+                }
+                if headers.exists()
+                else {}
+            )
+            if response.returncode or status != "200":
+                if values.get("location", "").startswith("https://vercel.com/"):
+                    raise DeploymentError(
+                        "Browser API access is blocked by Vercel Deployment Protection before CORS. Approve/configure backend browser access; authenticated CLI probes bypass this restriction."
+                    )
+                raise DeploymentError(
+                    f"Anonymous browser API {method} verification failed (HTTP {status or 'unknown'}); check backend access/protection settings."
+                )
+            if values.get("access-control-allow-origin") != origin:
+                raise DeploymentError(
+                    f"Backend browser CORS does not allow the exact frontend origin for {method}."
+                )
+            if method == "GET":
+                try:
+                    data = json.loads(body)
+                except ValueError:
+                    raise DeploymentError(
+                        "The browser API root did not return JSON."
+                    ) from None
+                if not isinstance(data, dict) or not isinstance(data.get("Hello"), str):
+                    raise DeploymentError(
+                        "The browser API root did not return the frontend's expected response."
+                    )
+            elif "GET" not in {
+                method.strip()
+                for method in values.get("access-control-allow-methods", "").split(",")
+            }:
+                raise DeploymentError(
+                    "Backend browser CORS preflight did not allow GET."
+                )
+            elif "content-type" not in {
+                header.strip().lower()
+                for header in values.get("access-control-allow-headers", "").split(",")
+            }:
+                raise DeploymentError(
+                    "Backend browser CORS preflight did not allow Content-Type."
+                )
+    print(
+        "Verified anonymous backend root access and exact browser GET/preflight CORS."
+    )
+    result = subprocess.run(
+        [
+            "vercel",
+            "curl",
+            "https://" + state["alias"] + "/",
+            "--",
+            "--fail",
+            "--silent",
+            "--show-error",
+            "--max-time",
+            "30",
+        ],
+        env={**os.environ, "VERCEL_PROJECT_ID": state["project_id"]},
+        text=True,
+        capture_output=True,
+        timeout=35,
+    )
+    if result.returncode:
+        raise DeploymentError(
+            "The frontend SSR page could not be retrieved for HttpClient transfer verification."
+        )
+    verify_ssr_state(result.stdout, state["runtime"]["BACKEND_URL"])
+    print(
+        "Verified deployed Angular SSR transfers the successful backend HttpClient response."
+    )
+
+
 def smoke(state):
-    path = "/api/boats" if state["component"] == "backend" else "/runtime-config.json"
+    path = "/boats" if state["component"] == "backend" else "/runtime-config.json"
     with tempfile.TemporaryDirectory() as directory:
         headers = Path(directory) / "headers"
         command = [
@@ -687,6 +862,8 @@ def smoke(state):
             "--fail",
             "--silent",
             "--show-error",
+            "--max-time",
+            "30",
             "--dump-header",
             str(headers),
         ]
@@ -697,6 +874,7 @@ def smoke(state):
             env={**os.environ, "VERCEL_PROJECT_ID": state["project_id"]},
             text=True,
             capture_output=True,
+            timeout=35,
         )
         if result.returncode:
             print(sanitized(result.stderr, state), end="")
@@ -739,6 +917,7 @@ def smoke(state):
             print(
                 "Verified live frontend runtime configuration matches its resolved backend."
             )
+            verify_browser_wiring(state)
 
 
 def plan_changes(files):

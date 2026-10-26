@@ -10,7 +10,7 @@ export async function loadBackendApiUrl(
   const response = await fetchConfig('/runtime-config.json', { cache: 'no-store' });
   if (!response.ok) throw new Error('Could not load the frontend runtime configuration.');
   const config: { backendUrl: string } = await response.json();
-  state.set(BACKEND_API_URL_STATE_KEY, new URL('/api', config.backendUrl).href);
+  state.set(BACKEND_API_URL_STATE_KEY, new URL('/', config.backendUrl).href);
 }
 
 function throwMissingBackendApiUrl(): never {

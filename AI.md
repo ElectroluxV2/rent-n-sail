@@ -1,5 +1,19 @@
 # AI usage docs
 
+## 2026-10-26 — Prefix-free backend routes and browser-aware deployment checks
+
+- AI assistance: OpenCode (GPT-6.1 Sol) implemented the requested removal of the backend `/api` prefix across FastAPI routes, frontend SSR/runtime URL construction, tests, deployment probes, and current documentation. Author attribution: `@ElectroluxV2` (Mateusz Budzisz, reverified with `gh api user`).
+- Added failing-then-passing root-route and runtime-URL regressions, explicit rejection of old prefixed routes, and a negative CORS preflight test. Tightened frontend deployment verification to require anonymous backend GET/preflight access plus a successful serialized SSR HttpClient response; URL-only transfer state and provider sign-in redirects cannot pass.
+- Reconfirmed that backend preview root GET/preflight requests are still intercepted by Vercel Authentication (302, no CORS header). Protection changes remain unapproved; the stack must not be called browser-ready while that policy blocks access. Progress and the outstanding access-policy/exact-frontend-hostname questions remain on PR #14.
+- Validation: 32 controller tests, seven backend tests with nine subtests, four Angular tests, lint/format/build, and seven-workflow/action-lock verification passed. Repeated real Chrome hydration against the rebuilt root-endpoint frontend: reachable backend transfers one HTTP response with zero hydration refetches; a sign-in redirect reproduces the missing successful HTTP cache and CORS error. The new CI parser accepts/rejects the corresponding actual SSR HTML, and the anonymous live probe fails explicitly on Deployment Protection.
+
+## 2026-10-26 — Browser CORS and Angular HTTP transfer-cache diagnosis
+
+- AI assistance: OpenCode (GPT-6.1 Sol) investigated the reported browser CORS error and missing HttpClient transfer state. Author attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- Reproduced backend preview GET and preflight requests redirecting to Vercel sign-in before FastAPI CORS runs. Previous authenticated CI probes bypassed that protection and therefore did not demonstrate browser accessibility.
+- Exercised the unchanged production Angular build through SSR and actual headless Chrome hydration using isolated public/protected backend fixtures. A public successful response produced one serialized HTTP response, zero duplicate hydration requests, and a fresh request only on explicit reload. A protected login redirect produced no successful HTTP response to transfer, one hydration request, and a browser CORS error. Both cases still transferred the backend URL. The working-app assertion fails against the protected fixture.
+- Posted reproduction evidence, ranked hypotheses, and questions on PR #14: confirm the exact frontend hostname and whether backend preview APIs may be public. No application source or deployment-protection settings were changed; the fix remains blocked on that access-policy decision. Temporary browser fixtures and dependencies are isolated in the approved temporary debug directory, not added to the repository.
+
 ## 2026-10-26 — Approved ordered CI/CD and sample database implementation
 
 - AI assistance: OpenCode (GPT-6.1 Sol) resumed the approved workflow redesign: three reusable workflows plus database/backend/frontend manual entry points and one ordered automatic entry point, native path planning, per-target concurrency, stable URLs, and runtime dependency wiring.

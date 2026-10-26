@@ -28,6 +28,8 @@ from ci.deploy import (
     runtime_diagnostics,
     select_deployment,
     smoke,
+    verify_browser_wiring,
+    verify_ssr_state,
 )
 
 
@@ -314,7 +316,7 @@ class ProviderBindingTests(unittest.TestCase):
     def test_runtime_diagnostics_reads_nested_vercel_request_messages(self):
         records = [
             {
-                "requestPath": "/api/boats",
+                "requestPath": "/boats",
                 "logs": [
                     {"message": "Driver init failed for postgresql://private-fixture"},
                     {"message": "ImportError: test diagnostic"},
@@ -400,6 +402,7 @@ class ProviderBindingTests(unittest.TestCase):
     def test_live_backend_verification_checks_database_rows_and_cors(self):
         def request(command, **kwargs):
             self.assertEqual(command[:2], ["vercel", "curl"])
+            self.assertEqual(command[2], "https://backend.test/boats")
             headers = Path(command[command.index("--dump-header") + 1])
             headers.write_text(
                 "HTTP/2 200\naccess-control-allow-origin: https://frontend.test\n"
@@ -439,6 +442,28 @@ class ProviderBindingTests(unittest.TestCase):
                     "runtime": {"BACKEND_URL": "https://backend.test"},
                 }
             )
+
+    def test_frontend_smoke_also_requires_browser_wiring_verification(self):
+        state = {
+            "component": "frontend",
+            "project_id": "frontend",
+            "alias": "frontend.test",
+            "runtime": {
+                "BACKEND_URL": "https://backend.test",
+                "FRONTEND_URL": "https://frontend.test",
+            },
+        }
+        with (
+            patch(
+                "ci.deploy.subprocess.run",
+                return_value=CompletedProcess(
+                    [], 0, '{"backendUrl":"https://backend.test"}', ""
+                ),
+            ),
+            patch("ci.deploy.verify_browser_wiring") as verify,
+        ):
+            smoke(state)
+        verify.assert_called_once_with(state)
 
     def test_reusing_a_ready_deployment_does_not_invoke_a_build_or_cli(self):
         class Provider:
@@ -560,6 +585,122 @@ class ProviderBindingTests(unittest.TestCase):
             restore_output(archive, restored, "frontend")
             self.assertFalse((restored / "functions/app.func").is_symlink())
             self.assertTrue((restored / "functions/app.func/server.mjs").is_file())
+
+
+class BrowserWiringTests(unittest.TestCase):
+    def setUp(self):
+        self.state = {
+            "component": "frontend",
+            "alias": "frontend.test",
+            "project_id": "frontend",
+            "runtime": {
+                "BACKEND_URL": "https://backend.test",
+                "FRONTEND_URL": "https://frontend.test",
+            },
+        }
+
+    def html(self, include_response=True):
+        state = {"backend-api-url": "https://backend.test/"}
+        if include_response:
+            state["123"] = {
+                "s": 200,
+                "u": "https://backend.test/",
+                "b": {"Hello": "World"},
+            }
+        return (
+            '<script id="ng-state" type="application/json">'
+            + json.dumps(state)
+            + "</script>"
+        )
+
+    def public_response(self, command, origin="https://frontend.test"):
+        headers = Path(command[command.index("--dump-header") + 1])
+        headers.write_text(
+            f"HTTP/2 200\nAccess-Control-Allow-Origin: {origin}\nAccess-Control-Allow-Methods: GET\nAccess-Control-Allow-Headers: Content-Type\n"
+        )
+        return CompletedProcess(command, 0, '{"Hello":"World"}\n200', "")
+
+    def test_browser_checks_use_anonymous_curl_and_verify_actual_ssr_http_state(self):
+        calls = []
+
+        def request(command, **kwargs):
+            calls.append(command)
+            if command[0] == "curl":
+                self.assertEqual(command[1], "--disable")
+                self.assertIn("https://backend.test/", command)
+                self.assertNotIn("VERCEL_TOKEN", kwargs["env"])
+                self.assertNotIn("GITHUB_TOKEN", kwargs["env"])
+                return self.public_response(command)
+            self.assertEqual(command[:3], ["vercel", "curl", "https://frontend.test/"])
+            return CompletedProcess(command, 0, self.html(), "")
+
+        with (
+            patch.dict(
+                os.environ,
+                {"VERCEL_TOKEN": "private-token", "GITHUB_TOKEN": "private-token"},
+            ),
+            patch("ci.deploy.subprocess.run", side_effect=request),
+        ):
+            verify_browser_wiring(self.state)
+        self.assertEqual(len(calls), 3)
+        self.assertIn("OPTIONS", calls[1])
+
+    def test_protection_redirect_cannot_pass_as_successful_cors_verification(self):
+        def request(command, **kwargs):
+            headers = Path(command[command.index("--dump-header") + 1])
+            headers.write_text(
+                "HTTP/2 302\nLocation: https://vercel.com/sso-api?private=fixture\n"
+            )
+            return CompletedProcess(command, 0, "sign-in\n302", "")
+
+        with (
+            patch("ci.deploy.subprocess.run", side_effect=request),
+            self.assertRaisesRegex(DeploymentError, "Deployment Protection") as caught,
+        ):
+            verify_browser_wiring(self.state)
+        self.assertNotIn("private=fixture", str(caught.exception))
+
+    def test_browser_cors_requires_the_exact_frontend_origin(self):
+        with (
+            patch(
+                "ci.deploy.subprocess.run",
+                side_effect=lambda command, **kwargs: self.public_response(
+                    command, "https://frontend.test.evil.test"
+                ),
+            ),
+            self.assertRaisesRegex(DeploymentError, "CORS"),
+        ):
+            verify_browser_wiring(self.state)
+
+    def test_browser_preflight_must_allow_get(self):
+        def request(command, **kwargs):
+            response = self.public_response(command)
+            if "OPTIONS" in command:
+                headers = Path(command[command.index("--dump-header") + 1])
+                headers.write_text(
+                    "Access-Control-Allow-Origin: https://frontend.test\nAccess-Control-Allow-Methods: POST\n"
+                )
+            return response
+
+        with (
+            patch("ci.deploy.subprocess.run", side_effect=request),
+            self.assertRaisesRegex(DeploymentError, "preflight"),
+        ):
+            verify_browser_wiring(self.state)
+
+    def test_transferring_only_the_api_url_is_not_a_successful_http_transfer(self):
+        with self.assertRaisesRegex(DeploymentError, "HttpClient"):
+            verify_ssr_state(self.html(include_response=False), "https://backend.test")
+        verify_ssr_state(self.html(), "https://backend.test")
+
+    def test_old_prefixed_urls_cannot_pass_root_endpoint_transfer_verification(self):
+        with self.assertRaisesRegex(DeploymentError, "HttpClient"):
+            verify_ssr_state(
+                self.html().replace(
+                    "https://backend.test/", "https://backend.test/api"
+                ),
+                "https://backend.test",
+            )
 
 
 if __name__ == "__main__":
