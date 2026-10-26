@@ -19,6 +19,8 @@ from urllib.error import HTTPError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
+ARTIFACT_VERSION = 2
+
 
 class DeploymentError(RuntimeError):
     pass
@@ -253,7 +255,11 @@ def alias_name(project_name, branch, target):
 
 
 def fingerprint(runtime):
-    return hashlib.sha256(json.dumps(runtime, sort_keys=True).encode()).hexdigest()
+    return hashlib.sha256(
+        json.dumps(
+            {"protocol": ARTIFACT_VERSION, "runtime": runtime}, sort_keys=True
+        ).encode()
+    ).hexdigest()
 
 
 def save_private(path, data):
@@ -371,7 +377,36 @@ def portable_copy(source, destination, allowed_root, ancestors=frozenset()):
                 child, destination / child.name, allowed_root, ancestors | {resolved}
             )
     else:
+        destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
+
+
+def materialize_file_maps(output_dir, workspace):
+    workspace = Path(workspace).resolve()
+    for path in Path(output_dir).glob("functions/**/*.func/.vc-config.json"):
+        config = json.loads(path.read_text())
+        mapping = config.pop("filePathMap", {})
+        root = path.parent.resolve()
+        for relative, source in mapping.items():
+            name = Path(relative)
+            if name.is_absolute() or ".." in name.parts:
+                raise DeploymentError("Unsafe mapped function destination.")
+            if any(
+                part.startswith(".env")
+                or part in {"__pycache__", ".pytest_cache", ".ruff_cache"}
+                for part in name.parts
+            ):
+                continue
+            destination = root / name
+            if not destination.resolve().is_relative_to(root):
+                raise DeploymentError(
+                    "Mapped function destination escapes the function."
+                )
+            original = workspace / source
+            if original.resolve() != destination.resolve():
+                portable_copy(original, destination, workspace)
+        if mapping:
+            path.write_text(json.dumps(config))
 
 
 def pack_output(source, archive, component, secrets=()):
@@ -385,13 +420,14 @@ def pack_output(source, archive, component, secrets=()):
         or configuration.get("daemons")
     ):
         raise DeploymentError("Unsupported portable Build Output configuration.")
+    workspace = Path(os.environ.get("GITHUB_WORKSPACE", source)).resolve()
+    if not source.resolve().is_relative_to(workspace):
+        workspace = source.resolve()
+    materialize_file_maps(source, workspace)
     with tempfile.TemporaryDirectory() as temporary:
         stage = Path(temporary) / "output"
         # Vercel can link output directories to build files elsewhere in the
         # checkout. Materialize those links, never runner credentials/tool dirs.
-        workspace = Path(os.environ.get("GITHUB_WORKSPACE", source)).resolve()
-        if not source.resolve().is_relative_to(workspace):
-            workspace = source.resolve()
         stage.mkdir()
         # Copy the public Build Output contract, not CLI builds.json (which can
         # bind output to the original target), diagnostics, or build caches.
@@ -424,7 +460,9 @@ def pack_output(source, archive, component, secrets=()):
                         f"Credential found in build output {path.relative_to(stage)}; refusing upload."
                     )
         manifest = Path(temporary) / "manifest.json"
-        manifest.write_text(json.dumps({"version": 1, "component": component}))
+        manifest.write_text(
+            json.dumps({"version": ARTIFACT_VERSION, "component": component})
+        )
         archive.parent.mkdir(parents=True, exist_ok=True)
         with tarfile.open(archive, "w:gz") as tar:
             tar.add(stage, arcname="output")
@@ -439,7 +477,7 @@ def restore_output(archive, destination, component):
                 raise DeploymentError("Expanded build output exceeds the size limit.")
             tar.extractall(temporary, filter="data")
         manifest = json.loads((Path(temporary) / "manifest.json").read_text())
-        if manifest != {"version": 1, "component": component}:
+        if manifest != {"version": ARTIFACT_VERSION, "component": component}:
             raise DeploymentError("Incompatible build output artifact.")
         if destination.exists():
             shutil.rmtree(destination)
@@ -501,9 +539,17 @@ def publish(state, provider):
         ]
         for key, value in metadata.items():
             command.extend(["--meta", f"{key}={value}"])
+        # Valueless --env reads the named process variable in Vercel CLI. Values
+        # stay out of command arguments while overriding inherited project env.
+        for key in state["runtime"]:
+            command.extend(["--env", key])
         result = subprocess.run(
             command,
-            env={**os.environ, "VERCEL_PROJECT_ID": state["project_id"]},
+            env={
+                **os.environ,
+                **state["runtime"],
+                "VERCEL_PROJECT_ID": state["project_id"],
+            },
             text=True,
             capture_output=True,
         )
@@ -525,6 +571,9 @@ def publish(state, provider):
             raise DeploymentError("Vercel did not finish deployment successfully.")
         deployment_id = deployment["id"]
     provider.assign(state["alias"], state["project_id"], deployment_id)
+    state["deployment_id"] = deployment_id
+    if os.environ.get("STATE_FILE"):
+        save_private(os.environ["STATE_FILE"], state)
     url = "https://" + state["alias"]
     output("url", url)
     output("deployment_id", deployment_id)
@@ -584,7 +633,7 @@ def runtime_diagnostics(state):
                 "--project",
                 state["project_id"],
                 "--deployment",
-                "https://" + state["alias"],
+                state.get("deployment_id") or "https://" + state["alias"],
                 "--since",
                 "10m",
                 "--limit",

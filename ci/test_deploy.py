@@ -176,6 +176,33 @@ class ArtifactTests(unittest.TestCase):
             "new-private-runtime",
         )
 
+    def test_file_path_maps_include_application_and_dependencies_in_portable_output(
+        self,
+    ):
+        application = self.root / "application"
+        application.mkdir()
+        (application / "main.py").write_text("app = 'application'\n")
+        (application / "dependency.py").write_text("value = 'dependency'\n")
+        config_path = self.function / ".vc-config.json"
+        config = json.loads(config_path.read_text())
+        config["filePathMap"] = {
+            "main.py": "application/main.py",
+            "_vendor/dependency.py": "application/dependency.py",
+        }
+        config_path.write_text(json.dumps(config))
+        with patch.dict(os.environ, {"GITHUB_WORKSPACE": str(self.root)}):
+            pack_output(self.source, self.archive, "backend")
+        restored = self.root / "complete"
+        restore_output(self.archive, restored, "backend")
+        self.assertTrue((restored / "functions/app.func/main.py").is_file())
+        self.assertTrue(
+            (restored / "functions/app.func/_vendor/dependency.py").is_file()
+        )
+        self.assertNotIn(
+            "filePathMap",
+            json.loads((restored / "functions/app.func/.vc-config.json").read_text()),
+        )
+
     def test_embedded_credentials_are_rejected_rather_than_uploaded(self):
         (self.function / "app.py").write_text("secret = 'credential-fixture'\n")
         with self.assertRaisesRegex(DeploymentError, "refusing upload"):
@@ -283,6 +310,59 @@ class NeonTests(unittest.TestCase):
 
 
 class ProviderBindingTests(unittest.TestCase):
+    def test_publish_passes_runtime_bindings_at_deployment_scope_without_secret_arguments(
+        self,
+    ):
+        class Api:
+            def request(self, *args, **kwargs):
+                return {"id": "ready", "readyState": "READY"}
+
+        class Provider:
+            api = Api()
+
+            def assign(self, *args):
+                pass
+
+        def deploy(command, **kwargs):
+            self.assertIn("--env", command)
+            self.assertIn("DATABASE_URL", command)
+            self.assertNotIn("postgresql://private-fixture", " ".join(command))
+            self.assertEqual(
+                kwargs["env"]["DATABASE_URL"], "postgresql://private-fixture"
+            )
+            return CompletedProcess(command, 0, "https://backend-deployment.test", "")
+
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(
+                os.environ,
+                {
+                    "BUILD_ARTIFACT_ID": "123",
+                    "GITHUB_RUN_ID": "456",
+                    "BUILD_ARTIFACT_NAME": "artifact",
+                    "GITHUB_SHA": "sha",
+                    "VERCEL_LOCAL_CONFIG": "vercel.json",
+                    "GITHUB_OUTPUT": str(Path(directory) / "out"),
+                    "GITHUB_STEP_SUMMARY": str(Path(directory) / "summary"),
+                },
+            ),
+            patch("ci.deploy.inject_runtime"),
+            patch("ci.deploy.subprocess.run", side_effect=deploy),
+        ):
+            publish(
+                {
+                    "component": "backend",
+                    "mode": "build",
+                    "project_id": "backend",
+                    "branch": "branch",
+                    "target": "preview",
+                    "alias": "backend.test",
+                    "fingerprint": "hash",
+                    "runtime": {"DATABASE_URL": "postgresql://private-fixture"},
+                },
+                Provider(),
+            )
+
     def test_live_backend_verification_checks_database_rows_and_cors(self):
         def request(command, **kwargs):
             self.assertEqual(command[:2], ["vercel", "curl"])
