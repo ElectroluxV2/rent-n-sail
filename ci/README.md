@@ -4,15 +4,15 @@
 
 `automatic.yml` contains exactly three ordered calls: database → backend → frontend. All CI/CD orchestration uses Bash, jq, Git, curl, and the provider CLIs; there is no Python controller.
 
-Each reusable workflow calls `.github/actions/component-changes` once, with only `path: database/`, `backend/`, or `frontend/`. The action reads `before`/`after` from `$GITHUB_EVENT_PATH`, runs a NUL-delimited Git diff, and uses jq's `contains` to output `changed=true/false`. It logs the searched substring, JSON-escaped changed file paths, and match result. It includes additions, deletions, both sides of renames, and every commit in the push. It does not handle event types, resolve branches, accept build overrides, check deployment fingerprints, or implement fallbacks. Missing SHAs/history fail instead of silently meaning "unchanged". The composite owns the `fetch-depth: 0` checkout immediately before the Git diff.
+Each reusable workflow calls `.github/actions/component-changes` once, with only `path: database/`, `backend/`, or `frontend/`. The action reads `before`/`after` from `$GITHUB_EVENT_PATH`, fetches the GitHub comparison JSON with the built-in token, and uses jq's `contains` to output `changed=true/false`. No Git command or checkout runs in the detector. The event supplies SHAs, not file lists; GitHub's API supplies the changed filenames, including previous names for renames. Logs show the searched substring, JSON-escaped changed paths with forced `jq -C` colors, and match result. Data used for matching/output remains uncolored. Missing SHAs, API errors, non-forward comparisons, and comparisons reaching GitHub's 300-file cap fail instead of silently meaning "unchanged"; there are no fallbacks.
 
-Callers invoke detection for pushes and PR `synchronize` events. Initial PR `opened`/`reopened` events explicitly run full validation/builds; manual runs use their existing build checkbox. These choices are outside the detector. Subsequent decisions use only the latest push, not the cumulative PR diff. Shared CI-only or documentation changes do not implicitly rebuild applications.
+Callers invoke detection for pushes and PR `synchronize` events. Initial PR `opened`/`reopened` events explicitly run full application validation/builds; manual application runs use their existing build checkbox. These choices are outside the detector. Application build decisions use only the latest push, not the cumulative PR diff. Shared CI-only or documentation changes do not implicitly rebuild applications. Database change detection is informational: the database job always applies pending migrations.
 
 The selected frontend production build is compiled once during validation. Vercel packaging reuses that validated output in the same job; standalone `build:vercel` still runs Angular's build first.
 
 `database.yml`, `backend.yml`, and `frontend.yml` are manual-only entry points; each calls only its corresponding reusable workflow. Manual application runs default to a build. Backend credentials are read privately from the matching Neon branch; the frontend reads its matching READY backend deployment through Vercel. Missing dependencies fail with an instruction to run the relevant workflow; no reusable workflow invokes another application's CI/CD. The frontend receives no Neon secrets.
 
-Local actions and reusable workflows use `$/` references, so they resolve to their defining repository's running commit without requiring a workspace checkout. Reusable jobs do not start with checkout: automatic change detection checks out its own Git history, while initial/manual runs fetch source immediately before source-dependent work. The deployment composite runs provider discovery from its downloaded action snapshot, so a manual reuse-only application run needs no checkout. Production-output restoration checks out deployment configuration only after selecting that path, and an existing validated frontend build is never erased by a redundant checkout.
+Local actions and reusable workflows use `$/` references, so they resolve to their defining repository's running commit without requiring a workspace checkout. Source is fetched only before application validation/builds or database migration tools; provider discovery runs from downloaded action snapshots. Both automatic and manual reuse-only application runs need no checkout. Production-output restoration checks out deployment configuration only after selecting that path, and an existing validated frontend build is never erased by a redundant checkout.
 
 Every target is serialized across automatic/manual runs with a non-cancelling queue. Each application/database also has a shared per-target concurrency group and a GitHub Environment.
 
@@ -42,7 +42,7 @@ Variables:
 - `NEON_PARENT_BRANCH_ID` (optional; project default branch if unset). This must be the production parent intended for copy-on-write previews.
 - `NEON_DATABASE_NAME` / `NEON_ROLE_NAME` (optional; `neondb` / `neondb_owner`).
 
-The Neon REST resolver checks for `preview/<git-branch>` first and creates a copy-on-write branch from production only when absent, inheriting supported compute defaults. Database changes select the migration/test path; unchanged databases keep their existing preview without rerunning migrations or schema-comment updates. Connection strings are resolved privately in the consuming job: direct for Alembic, pooled for the backend. The official Neon Schema Diff action updates the PR comment after the selected migration path; credentials never cross job outputs.
+The Neon REST resolver checks for `preview/<git-branch>` first and creates a copy-on-write branch from production only when absent, inheriting supported compute defaults. The database job always runs `alembic upgrade head` on the selected branch: only pending revisions are applied, with no reset or reapplication of completed revisions. There is no migration-test step. Connection strings are resolved privately in the consuming job: direct for Alembic, pooled for the backend. The official Neon Schema Diff action updates the PR comment after migrations; credentials never cross job outputs.
 
 GitHub Actions now owns explicit preview branch preparation so database-first ordering is possible. The existing Vercel–Neon resource connection may remain, but avoid two competing preview-branching mechanisms. Workflow runtime bindings explicitly select the prepared branch. Branch cleanup is not automatic; delete obsolete previews deliberately in Neon after closing branches.
 
@@ -66,7 +66,7 @@ The backend exposes `/`, `/health`, and `/boats` directly, without an `/api` pre
 
 Backend preview URLs must be accessible to browser API calls. Vercel team-login protection cannot be solved by exposing an automation bypass secret to JavaScript. Configure the backend API's deployment protection deliberately; these workflows do not silently disable project security.
 
-Publication waits for Vercel's READY status, assigns the stable URL, and records deployment outputs/summaries. Post-deployment HTTP/CORS/SSR probes and runtime-log debugging have been removed; deployment success does not claim an end-to-end browser validation. Normal lint, formatting, application/migration tests, build checks, artifact provenance checks, and credential-safety checks remain in place. Existing READY previews are reused without CLI setup, as required by the no-op reuse policy.
+Publication waits for Vercel's READY status, assigns the stable URL, and records deployment outputs/summaries. Post-deployment HTTP/CORS/SSR probes and runtime-log debugging have been removed; deployment success does not claim an end-to-end browser validation. Normal lint, formatting, application tests, build checks, artifact provenance checks, and credential-safety checks remain in place. Existing READY previews are reused without CLI setup, as required by the no-op reuse policy.
 
 Fork PRs do not receive repository secrets under the normal `pull_request` trigger and cannot deploy a credential-backed stack. There is no privileged `pull_request_target` checkout of fork code.
 
@@ -76,5 +76,4 @@ Fork PRs do not receive repository secrets under the normal `pull_request` trigg
 bash ci/test.sh
 shellcheck ci/*.sh .github/actions/component-changes/detect.sh
 uv run --directory backend --locked pytest -q
-uv run --directory database --locked pytest -q
 ```

@@ -12,8 +12,18 @@ passed=0
 pass() { passed=$((passed + 1)); printf 'ok %s - %s\n' "$passed" "$1"; }
 expect_failure() { if ("$@") > "$TEMP/failure" 2>&1; then die 'Expected a failure, but the operation succeeded.'; fi; }
 
-# Real Git history: the detector receives only a substring and event JSON.
+# Git is used only to construct API fixtures. The detector runs in an empty
+# directory, using event JSON and a mocked GitHub comparison response.
 mkdir "$TEMP/repo"
+mkdir "$TEMP/bin" "$TEMP/detector-workspace"
+cat > "$TEMP/bin/gh" <<'BASH'
+#!/usr/bin/env bash
+set -euo pipefail
+[[ "$1" == api && "$2" == "$EXPECTED_COMPARE_PATH" ]]
+[[ ${MOCK_GH_STATUS:-0} == 0 ]] || exit 1
+cat "$COMPARE_RESPONSE"
+BASH
+chmod +x "$TEMP/bin/gh"
 git -C "$TEMP/repo" init -q
 git -C "$TEMP/repo" config user.name 'CI fixture'
 git -C "$TEMP/repo" config user.email 'fixture@example.invalid'
@@ -27,10 +37,16 @@ printf 'new\n' > "$TEMP/repo/backend/added file"
 commit; backend_head=$(git -C "$TEMP/repo" rev-parse HEAD)
 printf 'new\n' > "$TEMP/repo/frontend/added"
 commit; frontend_head=$(git -C "$TEMP/repo" rev-parse HEAD)
-event() { jq -n --arg before "$1" --arg after "$2" '{before:$before,after:$after}' > "$TEMP/event.json"; }
+event() {
+  jq -n --arg before "$1" --arg after "$2" '{before:$before,after:$after}' > "$TEMP/event.json"
+  git -C "$TEMP/repo" diff --name-only --no-renames -z "$1" "$2" -- |
+    jq -Rs '{status:"ahead",files:(split("\u0000")[:-1] | map({filename:.}))}' > "$TEMP/compare.json"
+}
 detect() {
   : > "$TEMP/outputs"
-  (cd "$TEMP/repo"; GITHUB_EVENT_PATH="$TEMP/event.json" GITHUB_OUTPUT="$TEMP/outputs" bash "$ROOT/.github/actions/component-changes/detect.sh" "$1") > "$TEMP/detect.log"
+  local expected; expected=$(jq -r '"repos/owner/repo/compare/\(.before)...\(.after)"' "$TEMP/event.json")
+  (cd "$TEMP/detector-workspace"; PATH="$TEMP/bin:$PATH" COMPARE_RESPONSE="$TEMP/compare.json" EXPECTED_COMPARE_PATH="$expected" GITHUB_REPOSITORY=owner/repo GITHUB_EVENT_PATH="$TEMP/event.json" GITHUB_OUTPUT="$TEMP/outputs" bash "$ROOT/.github/actions/component-changes/detect.sh" "$1") > "$TEMP/detect.raw.log"
+  sed -E $'s/\033\\[[0-9;]*m//g' "$TEMP/detect.raw.log" > "$TEMP/detect.log"
   grep -Fxq "changed=$2" "$TEMP/outputs"
 }
 event "$base" "$frontend_head"
@@ -40,6 +56,7 @@ grep -Fxq 'Changed paths:' "$TEMP/detect.log"
 grep -Fq '"backend/added file"' "$TEMP/detect.log"
 grep -Fq '"frontend/added"' "$TEMP/detect.log"
 grep -Fxq 'Match: true' "$TEMP/detect.log"
+grep -Fq $'\033[' "$TEMP/detect.raw.log"
 pass 'detector logs the searched path, changed paths, and match result'
 detect frontend/ true; pass 'whole push includes newest frontend change'
 detect database/ false; pass 'unaffected path is false'
@@ -55,15 +72,23 @@ git -C "$TEMP/repo" mv 'backend/added file' frontend/moved; commit
 renamed=$(git -C "$TEMP/repo" rev-parse HEAD)
 event "$deleted" "$renamed"
 detect backend/ true; detect frontend/ true; pass 'both sides of renames are detected'
+jq -n '{status:"ahead",files:[{filename:"frontend/moved",previous_filename:"backend/added file",status:"renamed"}]}' > "$TEMP/compare.json"
+detect backend/ true; detect frontend/ true; pass 'GitHub renamed-file metadata includes the previous path'
 printf 'new\n' > "$TEMP/repo/backend/line"$'\n''break'; commit
 event "$renamed" "$(git -C "$TEMP/repo" rev-parse HEAD)"
-detect backend/ true; pass 'NUL-delimited paths preserve newline filenames'
+detect backend/ true; pass 'JSON file paths preserve newline filenames'
 grep -Fq '"backend/line\nbreak"' "$TEMP/detect.log"
 event "$(git -C "$TEMP/repo" rev-parse HEAD)" "$(git -C "$TEMP/repo" rev-parse HEAD)"
 detect backend/ false
 grep -Fxq '[]' "$TEMP/detect.log"
 grep -Fxq 'Match: false' "$TEMP/detect.log"
 pass 'an empty diff logs an empty path array and a false result'
+jq -n '{status:"ahead",files:[range(300) | {filename:("backend/file" + tostring)}]}' > "$TEMP/compare.json"
+expect_failure detect backend/ true; pass 'a capped comparison cannot silently skip affected source'
+jq -n '{status:"diverged",files:[{filename:"backend/file"}]}' > "$TEMP/compare.json"
+expect_failure detect backend/ true; pass 'unsupported comparison direction fails without fallback'
+jq -n '{status:"identical",files:[]}' > "$TEMP/compare.json"
+MOCK_GH_STATUS=1 expect_failure detect backend/ false; pass 'GitHub API errors do not become unchanged results'
 printf '{}\n' > "$TEMP/event.json"
 expect_failure detect backend/ false; pass 'missing event fields fail without fallback'
 
@@ -97,7 +122,7 @@ pass 'publishing reuse is read-only: no clone, CLI, alias write, or runtime rebi
   [[ $(neon_branch true 2> "$TEMP/neon-reuse.log") == existing ]]
   grep -Fxq 'Reusing existing Neon preview: preview/branch (existing). No branch created.' "$TEMP/neon-reuse.log"
 )
-pass 'existing database preview is also a no-op'
+pass 'existing database branches are reused without creating another branch'
 (
   api() {
     if [[ "$2" == GET ]]; then
@@ -291,9 +316,17 @@ for workflow in database backend frontend; do
   first=$(awk '/^    steps:/ {getline; print; exit}' "$ROOT/.github/workflows/reusable-$workflow.yml")
   [[ "$first" == *'🔍 Check '*' changes' ]]
 done
-grep -Fq 'uses: actions/checkout@v7.0.1' "$ROOT/.github/actions/component-changes/action.yml"
-grep -Fq 'fetch-depth: 0' "$ROOT/.github/actions/component-changes/action.yml"
+if grep -q 'actions/checkout' "$ROOT/.github/actions/component-changes/action.yml"; then die 'Detector must not check out source.'; fi
+if grep -Eq '(^|[[:space:]])git[[:space:]]' "$ROOT/.github/actions/component-changes/detect.sh"; then die 'Detector must not invoke Git.'; fi
+if grep -q 'steps.changes.outcome' "$ROOT/.github/actions/vercel-prebuilt-deploy/action.yml"; then die 'Detection does not make source available.'; fi
+for workflow in backend frontend; do
+  if grep 'RNS_SOURCE_READY:' "$ROOT/.github/workflows/reusable-$workflow.yml" | grep -q steps.changes; then die 'Detection must not imply checkout.'; fi
+done
 grep -Fq "if: steps.resolve.outputs.mode != 'reuse' && env.RNS_SOURCE_READY != 'true'" "$ROOT/.github/actions/vercel-prebuilt-deploy/action.yml"
 grep -Fq "bash \"\$GITHUB_ACTION_PATH/../../../ci/deploy.sh\" plan" "$ROOT/.github/actions/vercel-prebuilt-deploy/action.yml"
-pass 'checkout is owned by the Git detector or deferred until source/configuration is needed'
+pass 'detection needs no checkout and source is fetched only for builds/migrations/configuration'
+if grep -qE 'Test migrations|pytest|steps.selection|inputs.build' "$ROOT/.github/workflows/reusable-database.yml"; then die 'Database migrations must run unconditionally without migration tests.'; fi
+grep -Fq 'run: uv run --directory database --locked alembic upgrade head' "$ROOT/.github/workflows/reusable-database.yml"
+grep -Fq 'operation: database-env' "$ROOT/.github/workflows/reusable-database.yml"
+pass 'the database job always applies pending migrations without a migration-test step'
 printf '%s Bash CI/CD checks passed.\n' "$passed"

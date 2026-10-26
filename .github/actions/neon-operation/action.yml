@@ -1,0 +1,23 @@
+name: Neon operation
+description: Run a Neon provider operation from the action snapshot without checking out source.
+inputs:
+  operation:
+    description: database-branch, database-plan, or database-env.
+    required: true
+outputs:
+  branch_id:
+    description: Non-secret preview branch ID.
+    value: ${{ steps.operation.outputs.branch_id }}
+  parent_branch_id:
+    description: Non-secret production parent ID.
+    value: ${{ steps.operation.outputs.parent_branch_id }}
+runs:
+  using: composite
+  steps:
+    - name: 🔗 Resolve Neon resource
+      id: operation
+      shell: bash
+      env:
+        NEON_OPERATION: ${{ inputs.operation }}
+      # language=bash
+      run: bash "$GITHUB_ACTION_PATH/../../../ci/deploy.sh" "$NEON_OPERATION"

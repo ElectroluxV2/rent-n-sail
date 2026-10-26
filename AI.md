@@ -1,5 +1,13 @@
 # AI usage docs
 
+## 2026-10-26 — Checkout-free detection, colored JSON, and unconditional migrations
+
+- AI assistance: OpenCode (GPT-6.1 Sol) replaced the Git-based detector with a GitHub comparison-metadata lookup using event SHAs, removing checkout and Git commands from change detection. GitHub Actions event JSON omits changed-file lists, so this explicitly uses the existing GitHub token/API rather than pretending the event alone contains filenames. Matching still takes one path substring and emits one plain boolean. Displayed JSON uses forced `jq -C` colors; matching data and workflow outputs remain uncolored. API failures/truncation fail closed without a fallback. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- Source checkout is now limited to actual application builds, database migration tools, or missing-preview deployment configuration. Neon metadata/credential operations run from a small composite's downloaded snapshot and keep credentials private. Existing application previews require no checkout in automatic or manual runs.
+- Removed the migration-test step and database build gate as requested. The database job always applies `alembic upgrade head` to its selected branch, which skips already applied revisions. Updated the decision/summary messages and documentation; no database reset or downgrade was added.
+- Removed the now-redundant `Select migration path` step; there is no conditional migration path to select.
+- Validated on 2026-10-27: 45 local Bash checks, ShellCheck, actionlint (with documented modern-syntax/runner-label exceptions), action-lock verification, formatting, and diff checks passed before submission.
+
 ## 2026-10-26 — CI/CD decision logging and checkout placement
 
 - AI assistance: OpenCode (GPT-6.1 Sol) added logging of the searched substring, changed file paths, and match result to the existing Bash/jq detector. Paths are escaped when logged so spaces/newlines remain unambiguous and cannot inject workflow commands. The single `path` input, `changed` output, substring matching, and lack of event handling/fallbacks are unchanged. Added logging and empty-diff regressions. Author attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
