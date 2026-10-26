@@ -536,6 +536,89 @@ def publish(state, provider):
             )
 
 
+def sanitized(text, state):
+    for value in [
+        *(
+            os.environ.get(key, "")
+            for key in ("VERCEL_TOKEN", "NEON_API_KEY", "GITHUB_TOKEN")
+        ),
+        *state["runtime"].values(),
+    ]:
+        if value:
+            text = text.replace(value, "<REDACTED>")
+    text = re.sub(
+        r"x-vercel-protection-bypass[:=]\s*\S+",
+        "x-vercel-protection-bypass:<REDACTED>",
+        text,
+        flags=re.IGNORECASE,
+    )
+    return re.sub(r"postgres(?:ql)?(?:\+\w+)?://\S+", "<REDACTED DATABASE URL>", text)
+
+
+def runtime_diagnostics(state):
+    environment = {**os.environ, "VERCEL_PROJECT_ID": state["project_id"]}
+    try:
+        if state["component"] == "backend":
+            health = subprocess.run(
+                [
+                    "vercel",
+                    "curl",
+                    "https://" + state["alias"] + "/api/health",
+                    "--",
+                    "--fail",
+                    "--silent",
+                    "--show-error",
+                ],
+                env=environment,
+                text=True,
+                capture_output=True,
+                timeout=35,
+            )
+            print(
+                f"Diagnostic health probe: {'healthy' if health.returncode == 0 else 'failed'}."
+            )
+        logs = subprocess.run(
+            [
+                "vercel",
+                "logs",
+                "--project",
+                state["project_id"],
+                "--deployment",
+                "https://" + state["alias"],
+                "--since",
+                "10m",
+                "--limit",
+                "40",
+                "--json",
+            ],
+            env=environment,
+            text=True,
+            capture_output=True,
+            timeout=35,
+        )
+        messages = []
+        for line in logs.stdout.splitlines():
+            try:
+                record = json.loads(line)
+                message = record.get("data", record).get("message")
+                if isinstance(message, str):
+                    messages.append(message)
+            except (ValueError, AttributeError):
+                continue
+        if messages:
+            print(
+                "Sanitized runtime diagnostics:\n"
+                + sanitized("\n".join(messages)[-12000:], state)
+            )
+        else:
+            print(
+                "Runtime log query returned no message records. "
+                + sanitized(logs.stderr[-1500:], state)
+            )
+    except subprocess.TimeoutExpired:
+        print("Runtime diagnostics timed out; use the Vercel project logs.")
+
+
 def smoke(state):
     path = "/api/boats" if state["component"] == "backend" else "/runtime-config.json"
     with tempfile.TemporaryDirectory() as directory:
@@ -560,23 +643,8 @@ def smoke(state):
             capture_output=True,
         )
         if result.returncode:
-            detail = result.stderr
-            for value in [
-                *(
-                    os.environ.get(key, "")
-                    for key in ("VERCEL_TOKEN", "NEON_API_KEY", "GITHUB_TOKEN")
-                ),
-                *state["runtime"].values(),
-            ]:
-                if value:
-                    detail = detail.replace(value, "<REDACTED>")
-            detail = re.sub(
-                r"x-vercel-protection-bypass[:=]\s*\S+",
-                "x-vercel-protection-bypass:<REDACTED>",
-                detail,
-                flags=re.IGNORECASE,
-            )
-            print(detail, end="")
+            print(sanitized(result.stderr, state), end="")
+            runtime_diagnostics(state)
             raise DeploymentError(
                 "Authenticated preview HTTP verification failed; inspect the Vercel runtime logs."
             )

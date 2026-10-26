@@ -12,6 +12,7 @@
 - First live run reached Neon successfully but the branch action returned HTTP 412. Added sanitized provider diagnostics and an idempotent REST branch resolver that inherits project compute settings rather than sending action-specific overrides; no existing branches are deleted.
 - Pinned the deployment controller's Ruff target to runner Python 3.12 after a Python-3.14 formatting transformation broke bootstrap parsing. Added a regression test that parses every controller source file with the Python 3.12 grammar before app-specific uv setup.
 - The live ordered run created the Neon preview, applied the Alembic/sample schema, posted Neon's schema-diff comment, and deployed both applications successfully. Added authenticated application HTTP checks for inventory/CORS and frontend runtime wiring without disabling deployment protection or exposing bypass credentials to the browser.
+- Strict HTTP verification exposed a deployed backend 500 despite Vercel READY status. Added a separate health probe and sanitized runtime-log retrieval to distinguish packaging/bootstrap failures from database binding/connection errors before changing database state.
 
 ## 2026-10-26 — PR #14 fourth-round work and workflow redesign proposal
 
