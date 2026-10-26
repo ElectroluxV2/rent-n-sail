@@ -1,19 +1,17 @@
 import { TestBed } from '@angular/core/testing';
+import { TransferState } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { App } from './app';
-import { BACKEND_API_URL } from './backend-api-url';
+import { BACKEND_API_URL_STATE_KEY } from './backend-api-url';
 
 describe('App', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [App],
-      providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        { provide: BACKEND_API_URL, useValue: 'https://frontend.test/api' },
-      ],
+      providers: [provideHttpClient(), provideHttpClientTesting()],
     }).compileComponents();
+    TestBed.inject(TransferState).set(BACKEND_API_URL_STATE_KEY, 'https://backend.test/api');
   });
 
   afterEach(() => {
@@ -25,7 +23,7 @@ describe('App', () => {
     const http = TestBed.inject(HttpTestingController);
     fixture.detectChanges();
 
-    http.expectOne('https://frontend.test/api').flush({ Hello: 'World' });
+    http.expectOne('https://backend.test/api').flush({ Hello: 'World' });
     await fixture.whenStable();
     fixture.detectChanges();
 
@@ -36,7 +34,7 @@ describe('App', () => {
       .querySelector('form')
       ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     fixture.detectChanges();
-    http.expectOne('https://frontend.test/api').flush({ Hello: 'World again' });
+    http.expectOne('https://backend.test/api').flush({ Hello: 'World again' });
     await fixture.whenStable();
     fixture.detectChanges();
 

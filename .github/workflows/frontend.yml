@@ -17,17 +17,25 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: frontend-${{ github.ref == 'refs/heads/main' && 'production' || format('preview-{0}', github.event.pull_request.number || github.ref_name) }}
+  cancel-in-progress: false
+  queue: max
+
 env:
   PNPM_CONFIG_COLOR: always
   FORCE_COLOR: "1"
   VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
   VERCEL_PROJECT_ID: ${{ vars.VERCEL_FRONTEND_PROJECT_ID }}
-  VERCEL_ENVIRONMENT: ${{ github.event_name == 'pull_request' && 'preview' || 'production' }}
+  VERCEL_ENVIRONMENT: ${{ github.ref == 'refs/heads/main' && 'production' || 'preview' }}
   VERCEL_LOCAL_CONFIG: frontend/vercel.json
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    environment:
+      name: frontend-${{ github.ref == 'refs/heads/main' && 'production' || format('preview-{0}', github.event.pull_request.number || github.ref_name) }}
+      url: ${{ steps.deploy.outputs.url }}
 
     defaults:
       run:
@@ -60,35 +68,34 @@ jobs:
         with:
           working-directory: frontend
 
-      - name: Fail if lint or formatting failed
-        if: >-
-          ${{
-              steps.lint.outcome == 'failure' ||
-              steps.format.outcome == 'failure'
-          }}
-        # language=bash
-        run: exit 1
-
       - name: Angular tests
+        id: tests
+        continue-on-error: true
         # language=bash
-        run: pnpm exec ng test --watch=false
+        run: pnpm exec ng test --watch=false --reporters=default --reporters=github-actions
 
       - name: Angular build
+        id: build
+        continue-on-error: true
         # language=bash
         run: pnpm exec ng build
 
-      - name: Set up Vercel CLI
-        if: &deploy >-
+      - name: Fail if any frontend check failed
+        if: >-
           ${{
-              (github.ref == 'refs/heads/main' &&
-                (github.event_name == 'push' || github.event_name == 'workflow_dispatch')) ||
-              (github.event_name == 'pull_request' &&
-                github.event.pull_request.head.repo.full_name == github.repository)
+              steps.lint.outcome == 'failure' ||
+              steps.format.outcome == 'failure' ||
+              steps.tests.outcome == 'failure' ||
+              steps.build.outcome == 'failure'
           }}
-        uses: $/.github/actions/setup-vercel-cli
+        # language=bash
+        run: |
+          echo "::error title=Frontend checks failed::One or more frontend checks failed. See their annotations and logs."
+          exit 1
 
       - name: Build and deploy frontend with Vercel
-        if: *deploy
+        id: deploy
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         uses: $/.github/actions/vercel-prebuilt-deploy

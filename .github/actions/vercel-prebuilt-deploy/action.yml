@@ -1,24 +1,57 @@
 name: Deploy Vercel prebuilt project
 description: Build and upload a Vercel deployment using configuration from the calling job environment.
+outputs:
+  url:
+    description: URL of the deployed Vercel project.
+    value: ${{ steps.deploy.outputs.url }}
 runs:
   using: composite
   steps:
+    - name: Set up Vercel CLI
+      uses: $/.github/actions/setup-vercel-cli
+      env:
+        VERCEL_TOKEN: ""
+
     - name: Build and deploy prebuilt output
+      id: deploy
       shell: bash
       working-directory: ${{ github.workspace }}
       # language=bash
       run: |
-        : "${VERCEL_LOCAL_CONFIG:?An explicit Vercel config path is required.}"
+        trap 'echo "::error title=Vercel deployment failed::A Vercel command failed. See the command output for details."' ERR
+        if [[ -z "$VERCEL_LOCAL_CONFIG" ]]; then
+          echo "::error title=Missing Vercel config::VERCEL_LOCAL_CONFIG must name an explicit vercel.json file."
+          exit 1
+        fi
         if [[ ! -f "$VERCEL_LOCAL_CONFIG" ]]; then
-          printf 'Vercel config does not exist: %s\n' "$VERCEL_LOCAL_CONFIG" >&2
+          echo "::error title=Missing Vercel config::The configured Vercel config file does not exist."
+          printf 'Configured file: %s\n' "$VERCEL_LOCAL_CONFIG" >&2
           exit 1
         fi
 
         pull_args=(--yes --environment "$VERCEL_ENVIRONMENT")
         if [[ "$VERCEL_ENVIRONMENT" == "preview" ]]; then
-          pull_args+=(--git-branch "$GITHUB_HEAD_REF")
+          pull_args+=(--git-branch "${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}")
         fi
 
         vercel pull --local-config "$VERCEL_LOCAL_CONFIG" "${pull_args[@]}"
         vercel build --local-config "$VERCEL_LOCAL_CONFIG" --environment "$VERCEL_ENVIRONMENT"
-        vercel deploy --local-config "$VERCEL_LOCAL_CONFIG" --environment "$VERCEL_ENVIRONMENT" --prebuilt
+        deployment_url=$(vercel deploy --local-config "$VERCEL_LOCAL_CONFIG" --environment "$VERCEL_ENVIRONMENT" --prebuilt)
+        printf 'url=%s\n' "$deployment_url" >> "$GITHUB_OUTPUT"
+
+    - name: Write deployment summary
+      if: always()
+      shell: bash
+      env:
+        DEPLOYMENT_URL: ${{ steps.deploy.outputs.url }}
+      # language=bash
+      run: |
+        {
+          printf '## Vercel deployment\n\n'
+          printf 'Environment: **%s**\n\n' "$VERCEL_ENVIRONMENT"
+          if [[ -n "$DEPLOYMENT_URL" ]]; then
+            printf 'Deployment: <%s>\n' "$DEPLOYMENT_URL"
+          else
+            printf 'Deployment did not complete. See the workflow annotations and logs.\n'
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"

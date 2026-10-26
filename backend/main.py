@@ -1,6 +1,26 @@
+import os
+
 from fastapi import APIRouter, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        origin.strip()
+        for origin in os.environ.get(
+            "CORS_ALLOWED_ORIGINS",
+            "http://localhost:4200,https://rent-n-sail-frontend.vercel.app",
+        ).split(",")
+        if origin.strip()
+    ],
+    allow_origin_regex=os.environ.get(
+        "CORS_ALLOWED_ORIGIN_REGEX",
+        r"https://rent-n-sail-frontend-[a-z0-9-]+-rent-n-sail\.vercel\.app",
+    ),
+    allow_methods=["GET"],
+    allow_headers=["Content-Type"],
+)
 api_router = APIRouter(prefix="/api")
 
 

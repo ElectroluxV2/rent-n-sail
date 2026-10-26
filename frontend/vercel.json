@@ -9,14 +9,6 @@
   },
   "rewrites": [
     {
-      "source": "/api",
-      "destination": "https://rent-n-sail-backend.vercel.app/api"
-    },
-    {
-      "source": "/api/:path*",
-      "destination": "https://rent-n-sail-backend.vercel.app/api/:path*"
-    },
-    {
       "source": "/",
       "destination": "/api/index.js"
     },

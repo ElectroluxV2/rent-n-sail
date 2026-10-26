@@ -19,17 +19,26 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: backend-${{ github.ref == 'refs/heads/main' && 'production' || format('preview-{0}', github.event.pull_request.number || github.ref_name) }}
+  cancel-in-progress: false
+  queue: max
+
 env:
   PNPM_CONFIG_COLOR: always
   FORCE_COLOR: "1"
   VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
   VERCEL_PROJECT_ID: ${{ vars.VERCEL_BACKEND_PROJECT_ID }}
-  VERCEL_ENVIRONMENT: ${{ github.event_name == 'pull_request' && 'preview' || 'production' }}
+  UV_PYTHON_PREFERENCE: only-managed
+  VERCEL_ENVIRONMENT: ${{ github.ref == 'refs/heads/main' && 'production' || 'preview' }}
   VERCEL_LOCAL_CONFIG: vercel.json
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    environment:
+      name: backend-${{ github.ref == 'refs/heads/main' && 'production' || format('preview-{0}', github.event.pull_request.number || github.ref_name) }}
+      url: ${{ steps.deploy.outputs.url }}
 
     defaults:
       run:
@@ -48,10 +57,8 @@ jobs:
         with:
           working-directory: backend
           enable-cache: true
-
-      - name: Install Python runtime for local Vercel build
-        # language=bash
-        run: uv python install 3.14 --default
+          cache-python: true
+          activate-environment: true
 
       - name: Install dependencies
         # language=bash
@@ -77,27 +84,27 @@ jobs:
           # language=bash
           args: format --check --output-format=github
 
-      - name: Fail if lint or formatting failed
+      - name: Backend tests
+        id: tests
+        continue-on-error: true
+        # language=bash
+        run: uv run --locked python -m unittest discover -v
+
+      - name: Fail if any backend check failed
         if: >-
           ${{
               steps.ruff_lint.outcome == 'failure' ||
-              steps.ruff_format.outcome == 'failure'
+              steps.ruff_format.outcome == 'failure' ||
+              steps.tests.outcome == 'failure'
           }}
         # language=bash
-        run: exit 1
-
-      - name: Set up Vercel CLI
-        if: &deploy >-
-          ${{
-              (github.ref == 'refs/heads/main' &&
-                (github.event_name == 'push' || github.event_name == 'workflow_dispatch')) ||
-              (github.event_name == 'pull_request' &&
-                github.event.pull_request.head.repo.full_name == github.repository)
-          }}
-        uses: $/.github/actions/setup-vercel-cli
+        run: |
+          echo "::error title=Backend checks failed::One or more backend checks failed. See their annotations and logs."
+          exit 1
 
       - name: Build and deploy backend with Vercel
-        if: *deploy
+        id: deploy
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         uses: $/.github/actions/vercel-prebuilt-deploy
