@@ -10,7 +10,13 @@ import { join } from 'node:path';
 const browserDistFolder = join(import.meta.dirname, '../browser');
 
 const app = express();
-const angularApp = new AngularNodeAppEngine();
+const allowedHosts = [
+  process.env['VERCEL_URL'],
+  process.env['VERCEL_BRANCH_URL'],
+  process.env['VERCEL_PROJECT_PRODUCTION_URL'],
+  'localhost',
+].filter((host): host is string => Boolean(host));
+const angularApp = new AngularNodeAppEngine({ allowedHosts });
 
 /**
  * Example Express Rest API endpoints can be defined here.

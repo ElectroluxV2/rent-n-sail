@@ -1,10 +1,20 @@
 name: Backend CI
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend.yml"
+      - ".github/workflows/actions.lock"
+      - ".github/actions/vercel-prebuilt-deploy/**"
   pull_request:
     paths:
       - "backend/**"
       - ".github/workflows/backend.yml"
+      - ".github/workflows/actions.lock"
+      - ".github/actions/vercel-prebuilt-deploy/**"
   workflow_dispatch:
 
 permissions:
@@ -30,11 +40,23 @@ jobs:
           filter: tree:0
           persist-credentials: false
 
+      - name: Set up pnpm with GitHub Actions cache
+        uses: pnpm/setup@v3.1.1
+        with:
+          working-directory: backend
+          version: 12.15.0
+          runtime: node@24
+          cache: true
+
       - name: Set up uv
         uses: astral-sh/setup-uv@v10.3.2
         with:
           working-directory: backend
           enable-cache: true
+
+      - name: Install Python runtime for local Vercel build
+        # language=bash
+        run: uv python install 3.14 --default
 
       - name: Install dependencies
         # language=bash
@@ -68,3 +90,48 @@ jobs:
           }}  
         # language=bash
         run: exit 1
+
+  deploy:
+    needs: build
+    if: >-
+      ${{
+          (github.ref == 'refs/heads/main' &&
+            (github.event_name == 'push' || github.event_name == 'workflow_dispatch')) ||
+          (github.event_name == 'pull_request' &&
+            github.event.pull_request.head.repo.full_name == github.repository)
+      }}
+    runs-on: ubuntu-latest
+
+    env:
+      PNPM_CONFIG_COLOR: always
+      FORCE_COLOR: "1"
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_BACKEND_PROJECT_ID }}
+      VERCEL_ENVIRONMENT: ${{ github.event_name == 'pull_request' && 'preview' || 'production' }}
+      VERCEL_GIT_BRANCH: ${{ github.head_ref }}
+      VERCEL_LOCAL_CONFIG: ""
+      VERCEL_CLI_VERSION: 65.2.0
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          filter: tree:0
+          persist-credentials: false
+
+      - name: Set up pnpm with GitHub Actions cache
+        uses: pnpm/setup@v3.1.1
+        with:
+          working-directory: backend
+          version: 12.15.0
+          runtime: node@24
+          cache: true
+
+      - name: Build and deploy backend with Vercel
+        uses: ./.github/actions/vercel-prebuilt-deploy

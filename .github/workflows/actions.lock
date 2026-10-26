@@ -7,6 +7,7 @@ workflows:
         - 'actions/checkout@v7.0.1'
         - 'astral-sh/ruff-action@v4.1.0'
         - 'astral-sh/setup-uv@v10.3.2'
+        - 'pnpm/setup@v3.1.1'
     '.github/workflows/frontend.yml':
         - 'actions/checkout@v7.0.1'
         - 'oxc-project/oxfmt-action@v0.0.1'

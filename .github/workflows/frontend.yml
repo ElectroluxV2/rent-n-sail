@@ -1,11 +1,21 @@
 name: Frontend CI
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend.yml"
+      - ".github/workflows/actions.lock"
+      - ".github/actions/vercel-prebuilt-deploy/**"
   pull_request:
     paths:
       - "frontend/**"
       - ".github/workflows/frontend.yml"
-  workflow_dispatch: 
+      - ".github/workflows/actions.lock"
+      - ".github/actions/vercel-prebuilt-deploy/**"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -30,10 +40,11 @@ jobs:
           filter: tree:0
           persist-credentials: false
 
-      - name: Pnpm
+      - name: Set up pnpm with GitHub Actions cache
         uses: pnpm/setup@v3.1.1
         with:
           working-directory: frontend
+          runtime: node@24
           cache: true
 
       - name: Lint (Angular ESLint)
@@ -49,15 +60,69 @@ jobs:
         with:
           working-directory: frontend
 
-      - name: Angular
-        # language=bash
-        run: pnpm exec ng build
-
       - name: Fail if lint or formatting failed
         if: >-
           ${{
               steps.lint.outcome == 'failure' ||
               steps.format.outcome == 'failure'
-          }}  
+          }}
         # language=bash
         run: exit 1
+
+      - name: Angular tests
+        # language=bash
+        run: pnpm exec ng test --watch=false
+
+      - name: Angular build
+        if: >-
+          ${{
+              (github.event_name == 'pull_request' &&
+                github.event.pull_request.head.repo.full_name != github.repository) ||
+              (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main')
+          }}
+        # language=bash
+        run: pnpm exec ng build
+
+  deploy:
+    needs: build
+    if: >-
+      ${{
+          (github.ref == 'refs/heads/main' &&
+            (github.event_name == 'push' || github.event_name == 'workflow_dispatch')) ||
+          (github.event_name == 'pull_request' &&
+            github.event.pull_request.head.repo.full_name == github.repository)
+      }}
+    runs-on: ubuntu-latest
+
+    env:
+      PNPM_CONFIG_COLOR: always
+      FORCE_COLOR: "1"
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_FRONTEND_PROJECT_ID }}
+      VERCEL_ENVIRONMENT: ${{ github.event_name == 'pull_request' && 'preview' || 'production' }}
+      VERCEL_GIT_BRANCH: ${{ github.head_ref }}
+      VERCEL_LOCAL_CONFIG: frontend/vercel.json
+      VERCEL_CLI_VERSION: 65.2.0
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          filter: tree:0
+          persist-credentials: false
+
+      - name: Set up pnpm with GitHub Actions cache
+        uses: pnpm/setup@v3.1.1
+        with:
+          working-directory: frontend
+          runtime: node@24
+          cache: true
+
+      - name: Build and deploy frontend with Vercel
+        uses: ./.github/actions/vercel-prebuilt-deploy

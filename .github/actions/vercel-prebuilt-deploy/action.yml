@@ -1,0 +1,32 @@
+name: Deploy Vercel prebuilt project
+description: Build and upload a Vercel deployment using configuration from the calling job environment.
+runs:
+  using: composite
+  steps:
+    - name: Install Vercel CLI with pnpm
+      shell: bash
+      run: pnpm add --global "vercel@$VERCEL_CLI_VERSION"
+
+    - name: Build and deploy prebuilt output
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        config_args=()
+        if [[ -n "$VERCEL_LOCAL_CONFIG" ]]; then
+          config_args+=(--local-config "$VERCEL_LOCAL_CONFIG")
+        fi
+
+        if [[ "$VERCEL_ENVIRONMENT" == "preview" ]]; then
+          if [[ -z "$VERCEL_GIT_BRANCH" ]]; then
+            printf '%s\n' "A git branch is required for a Vercel preview deployment." >&2
+            exit 1
+          fi
+
+          vercel pull --yes --environment=preview --git-branch="$VERCEL_GIT_BRANCH" --token="$VERCEL_TOKEN"
+          vercel build "${config_args[@]}" --token="$VERCEL_TOKEN"
+          vercel deploy --prebuilt "${config_args[@]}" --token="$VERCEL_TOKEN"
+        else
+          vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+          vercel build "${config_args[@]}" --prod --token="$VERCEL_TOKEN"
+          vercel deploy --prebuilt "${config_args[@]}" --prod --token="$VERCEL_TOKEN"
+        fi
