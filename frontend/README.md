@@ -11,7 +11,7 @@ The frontend and backend use separate Vercel projects. Postgres is hosted by Neo
 - Backend CORS uses only the explicit `CORS_ALLOWED_ORIGINS` allowlist. The automated stack sets it to the verified stable frontend origin; independent/local deployments must configure it explicitly. There are no regex patterns or implicit trusted domains. The current API permits cross-origin `GET` requests without cookies.
 - Open the stable frontend URL from the GitHub Environment, not an arbitrary deployment hostname. Vercel Authentication on the backend can redirect API calls before CORS runs; changing application CORS cannot authorize that redirect. The API must be reachable under the approved browser-access policy for SSR to obtain and transfer a successful HttpClient response.
 
-The [stack workflows](../ci/README.md) prepare the Neon preview first, apply [Alembic migrations](../database/README.md), deploy/resolve the backend, then deploy/resolve the frontend. Neon’s official action comments schema changes on the PR. Database credentials are resolved privately in each consuming job; no database password is passed through job outputs or public frontend configuration.
+The [stack workflows](../.github/CI.md) prepare the Neon preview first, apply [Alembic migrations](../database/README.md), deploy/resolve the backend, then deploy/resolve the frontend. Neon’s official action comments schema changes on the PR. Database credentials are resolved privately in each consuming job; no database password is passed through job outputs or public frontend configuration.
 
 The remaining page rewrites only route frontend requests to Angular SSR.
 

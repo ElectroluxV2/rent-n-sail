@@ -1,5 +1,17 @@
 # AI usage docs
 
+## 2026-10-27 — Colocated CI scripts and conservative large-change detection
+
+- AI assistance: OpenCode (GPT-6.1 Sol) moved the Vercel deployment/artifact scripts beside their composite definition, gave the Neon composite its own colocated entry point, placed shared provider helpers in `.github/actions/_shared`, and moved local tests/docs under `.github`. Updated script invocations and documentation links. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- Changed the requested API-cap policy: when GitHub returns 300 files, the detector logs the cap and returns `changed=true` for the requested substring instead of failing. This is conservative for each of the three users of the shared action; below the cap actual path matches still decide. No checkout or Git dependency was added to detection, and displayed JSON remains colored.
+- Kept `Select database reference` unchanged as requested. Added regression coverage for below-cap versus capped comparisons and the relocated entry points.
+- Validation: 46 local Bash checks, ShellCheck, actionlint (with documented syntax/runner-label exceptions), action-lock verification, formatting, and diff checks passed before submission.
+
+## 2026-10-27 — Database-reference step explanation
+
+- AI assistance: OpenCode (GPT-6.1 Sol) inspected `Select database reference` and its consumers. It only chooses the preview/production branch ID and exposes it for credentials, schema comparison, summary, and reusable outputs; it performs no provider operation. Explained that the selected value is required but the separate step can be removed by inlining the selection. No workflow changes were made for this question. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- Follow-up: confirmed four direct references to `steps.reference.outputs.branch_id`, all in the reusable database workflow: job output, migration credentials, schema diff, and deployment summary.
+
 ## 2026-10-26 — Checkout-free detection, colored JSON, and unconditional migrations
 
 - AI assistance: OpenCode (GPT-6.1 Sol) replaced the Git-based detector with a GitHub comparison-metadata lookup using event SHAs, removing checkout and Git commands from change detection. GitHub Actions event JSON omits changed-file lists, so this explicitly uses the existing GitHub token/API rather than pretending the event alone contains filenames. Matching still takes one path substring and emits one plain boolean. Displayed JSON uses forced `jq -C` colors; matching data and workflow outputs remain uncolored. API failures/truncation fail closed without a fallback. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).

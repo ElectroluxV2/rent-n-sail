@@ -20,4 +20,4 @@ runs:
       env:
         NEON_OPERATION: ${{ inputs.operation }}
       # language=bash
-      run: bash "$GITHUB_ACTION_PATH/../../../ci/deploy.sh" "$NEON_OPERATION"
+      run: bash "$GITHUB_ACTION_PATH/neon.sh" "$NEON_OPERATION"

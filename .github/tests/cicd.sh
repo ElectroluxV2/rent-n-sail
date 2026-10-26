@@ -2,12 +2,12 @@
 # Provider fixtures intentionally isolate their function/env overrides in subshells.
 # shellcheck disable=SC2030,SC2031
 set -euo pipefail
-ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 TEMP=$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/rns-tests.XXXXXX")
 trap 'rm -rf -- "$TEMP"' EXIT
 export CI_TMP=$TEMP
-# shellcheck source=ci/deploy.sh
-source "$ROOT/ci/deploy.sh"
+# shellcheck source=.github/actions/vercel-prebuilt-deploy/deploy.sh
+source "$ROOT/.github/actions/vercel-prebuilt-deploy/deploy.sh"
 passed=0
 pass() { passed=$((passed + 1)); printf 'ok %s - %s\n' "$passed" "$1"; }
 expect_failure() { if ("$@") > "$TEMP/failure" 2>&1; then die 'Expected a failure, but the operation succeeded.'; fi; }
@@ -83,8 +83,14 @@ detect backend/ false
 grep -Fxq '[]' "$TEMP/detect.log"
 grep -Fxq 'Match: false' "$TEMP/detect.log"
 pass 'an empty diff logs an empty path array and a false result'
-jq -n '{status:"ahead",files:[range(300) | {filename:("backend/file" + tostring)}]}' > "$TEMP/compare.json"
-expect_failure detect backend/ true; pass 'a capped comparison cannot silently skip affected source'
+jq -n '{status:"ahead",files:[range(299) | {filename:("frontend/file" + tostring)}]}' > "$TEMP/compare.json"
+detect backend/ false; pass 'below the API cap, only actual matching paths are changed'
+jq -n '{status:"ahead",files:[range(300) | {filename:("frontend/file" + tostring)}]}' > "$TEMP/compare.json"
+detect backend/ true
+grep -Fq '300-file cap; assuming the searched path changed.' "$TEMP/detect.log"
+detect database/ true
+detect frontend/ true
+pass 'at the API cap every requested path is conservatively changed, without failure'
 jq -n '{status:"diverged",files:[{filename:"backend/file"}]}' > "$TEMP/compare.json"
 expect_failure detect backend/ true; pass 'unsupported comparison direction fails without fallback'
 jq -n '{status:"identical",files:[]}' > "$TEMP/compare.json"
@@ -288,13 +294,13 @@ pass 'provider logs redact tokens and database URLs'
 [[ $(grep -l 'uses: \$/\.github/actions/component-changes' "$ROOT"/.github/workflows/reusable-*.yml | wc -l | tr -d ' ') == 3 ]]
 [[ $(awk '/^jobs:/{jobs=1;next} jobs && /^  [a-z]+:/{print $1}' "$ROOT/.github/workflows/automatic.yml" | tr '\n' ' ') == 'database: backend: frontend: ' ]]
 if grep -qE 'uses:.*reusable-(database|backend|frontend)' "$ROOT"/.github/workflows/reusable-*.yml; then die 'Nested application workflow call found.'; fi
-if grep -R -nE 'python3|ci/deploy\.py|unittest' "$ROOT/.github"; then die 'Python CI/CD glue found.'; fi
+if grep -R -nE 'python3|unittest' "$ROOT/.github/workflows" "$ROOT/.github/actions"; then die 'Python CI/CD glue found.'; fi
 pass 'three detector calls, exactly three automatic jobs, no nested workflows or Python glue'
 condition=$(awk '/- name: ⚙️ Set up Vercel CLI/ {getline; print}' "$ROOT/.github/actions/vercel-prebuilt-deploy/action.yml")
 [[ "$condition" == "      if: steps.resolve.outputs.mode != 'reuse'" ]]
 pass 'reuse skips deployment toolchain setup'
-if grep -R -nE 'ci/deploy\.sh smoke|name:.*([Vv]erify|[Dd]ebug|[Dd]iagnostics)' "$ROOT/.github"; then die 'Debug deployment step found.'; fi
-if grep -nE '^(header_value|verify_ssr_state|runtime_diagnostics|verify_browser_wiring|smoke)\(\)' "$ROOT/ci/deploy.sh"; then die 'Unused deployment debugging code found.'; fi
+if grep -R -nE 'name:.*([Vv]erify|[Dd]ebug|[Dd]iagnostics)' "$ROOT/.github/workflows" "$ROOT/.github/actions"; then die 'Debug deployment step found.'; fi
+if grep -nE '^(header_value|verify_ssr_state|runtime_diagnostics|verify_browser_wiring|smoke)\(\)' "$ROOT/.github/actions/vercel-prebuilt-deploy/deploy.sh"; then die 'Unused deployment debugging code found.'; fi
 pass 'deployment verification/debug steps and their unused implementation are removed'
 if grep -R -nE --include='*.yml' --include='*.yaml' '^[[:space:]]*- (uses|run|id|if|shell|env|with):' "$ROOT/.github"; then die 'A configured step has no custom name.'; fi
 names=$(grep -RhE --include='*.yml' --include='*.yaml' '^[[:space:]]*- name:' "$ROOT/.github" | sed 's/^[[:space:]]*- name: //')
@@ -311,7 +317,7 @@ for workflow in backend frontend; do
   done
 done
 pass 'matching application step purposes use identical emoji and labels'
-if grep -RqE 'run: bash ci/test\.sh|uses: \./' "$ROOT/.github"; then die 'CI self-test step or old local uses syntax found.'; fi
+if grep -RqE --include='*.yml' --include='*.yaml' 'run: bash \.github/tests/cicd\.sh|uses: \./' "$ROOT/.github"; then die 'CI self-test step or old local uses syntax found.'; fi
 for workflow in database backend frontend; do
   first=$(awk '/^    steps:/ {getline; print; exit}' "$ROOT/.github/workflows/reusable-$workflow.yml")
   [[ "$first" == *'🔍 Check '*' changes' ]]
@@ -323,7 +329,8 @@ for workflow in backend frontend; do
   if grep 'RNS_SOURCE_READY:' "$ROOT/.github/workflows/reusable-$workflow.yml" | grep -q steps.changes; then die 'Detection must not imply checkout.'; fi
 done
 grep -Fq "if: steps.resolve.outputs.mode != 'reuse' && env.RNS_SOURCE_READY != 'true'" "$ROOT/.github/actions/vercel-prebuilt-deploy/action.yml"
-grep -Fq "bash \"\$GITHUB_ACTION_PATH/../../../ci/deploy.sh\" plan" "$ROOT/.github/actions/vercel-prebuilt-deploy/action.yml"
+grep -Fq "bash \"\$GITHUB_ACTION_PATH/deploy.sh\" plan" "$ROOT/.github/actions/vercel-prebuilt-deploy/action.yml"
+grep -Fq "bash \"\$GITHUB_ACTION_PATH/neon.sh\" \"\$NEON_OPERATION\"" "$ROOT/.github/actions/neon-operation/action.yml"
 pass 'detection needs no checkout and source is fetched only for builds/migrations/configuration'
 if grep -qE 'Test migrations|pytest|steps.selection|inputs.build' "$ROOT/.github/workflows/reusable-database.yml"; then die 'Database migrations must run unconditionally without migration tests.'; fi
 grep -Fq 'run: uv run --directory database --locked alembic upgrade head' "$ROOT/.github/workflows/reusable-database.yml"

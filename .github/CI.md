@@ -4,7 +4,7 @@
 
 `automatic.yml` contains exactly three ordered calls: database → backend → frontend. All CI/CD orchestration uses Bash, jq, Git, curl, and the provider CLIs; there is no Python controller.
 
-Each reusable workflow calls `.github/actions/component-changes` once, with only `path: database/`, `backend/`, or `frontend/`. The action reads `before`/`after` from `$GITHUB_EVENT_PATH`, fetches the GitHub comparison JSON with the built-in token, and uses jq's `contains` to output `changed=true/false`. No Git command or checkout runs in the detector. The event supplies SHAs, not file lists; GitHub's API supplies the changed filenames, including previous names for renames. Logs show the searched substring, JSON-escaped changed paths with forced `jq -C` colors, and match result. Data used for matching/output remains uncolored. Missing SHAs, API errors, non-forward comparisons, and comparisons reaching GitHub's 300-file cap fail instead of silently meaning "unchanged"; there are no fallbacks.
+Each reusable workflow calls `.github/actions/component-changes` once, with only `path: database/`, `backend/`, or `frontend/`. The action reads `before`/`after` from `$GITHUB_EVENT_PATH`, fetches the GitHub comparison JSON with the built-in token, and uses jq's `contains` to output `changed=true/false`. No Git command or checkout runs in the detector. The event supplies SHAs, not file lists; GitHub's API supplies the changed filenames, including previous names for renames. Logs show the searched substring, JSON-escaped changed paths with forced `jq -C` colors, and match result. Data used for matching/output remains uncolored. At GitHub's 300-file cap, the action logs the limit and returns `changed=true` for any requested path, since further matching files may have been truncated. Below the cap, actual paths decide the result. Missing SHAs, API errors, and non-forward comparisons still fail rather than silently meaning "unchanged".
 
 Callers invoke detection for pushes and PR `synchronize` events. Initial PR `opened`/`reopened` events explicitly run full application validation/builds; manual application runs use their existing build checkbox. These choices are outside the detector. Application build decisions use only the latest push, not the cumulative PR diff. Shared CI-only or documentation changes do not implicitly rebuild applications. Database change detection is informational: the database job always applies pending migrations.
 
@@ -26,7 +26,7 @@ Every configured workflow/composite step has an explicit emoji-prefixed name. Th
 - 🧹 lint; 🎨 formatting; 🧪 tests; 🔨 builds.
 - 🚀 publication/migrations; 📝 reports; ❌ failures.
 
-Selection and resource-resolution steps log their decisions: full build/migration versus reuse, preview branch creation/reuse, selected production parent/database reference, and chosen deployment IDs/URLs. Private connection values and tokens are not printed. CI-script regression tests run locally with `bash ci/test.sh`, not as an extra workflow step.
+Selection and resource-resolution steps log their decisions: full build/migration versus reuse, preview branch creation/reuse, selected production parent/database reference, and chosen deployment IDs/URLs. Private connection values and tokens are not printed. Scripts live beside their action definitions; shared provider helpers are in `.github/actions/_shared`. CI-script regression tests run locally with `bash .github/tests/cicd.sh`, not as an extra workflow step.
 
 ## Repository setup
 
@@ -73,7 +73,7 @@ Fork PRs do not receive repository secrets under the normal `pull_request` trigg
 ## Verification
 
 ```bash
-bash ci/test.sh
-shellcheck ci/*.sh .github/actions/component-changes/detect.sh
+bash .github/tests/cicd.sh
+shellcheck .github/actions/*/*.sh .github/tests/*.sh
 uv run --directory backend --locked pytest -q
 ```

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Shared Bash helpers. Entry points set strict mode and own the temporary dir.
+# Shared provider helpers for the colocated action scripts.
 die() { printf '::error title=Deployment failed::%s\n' "$*" >&2; exit 1; }
 required() { [[ -n ${!1:-} ]] || die "Configure $1 before deploying."; }
 out() {

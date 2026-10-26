@@ -18,7 +18,7 @@ runs:
           echo "STATE_FILE=$STATE_FILE"
           echo "ARCHIVE_PATH=$ARCHIVE_PATH"
         } >> "$GITHUB_ENV"
-        bash "$GITHUB_ACTION_PATH/../../../ci/deploy.sh" plan
+        bash "$GITHUB_ACTION_PATH/deploy.sh" plan
     - name: 📥 Checkout deployment configuration
       if: steps.resolve.outputs.mode != 'reuse' && env.RNS_SOURCE_READY != 'true'
       uses: actions/checkout@v7.0.1
@@ -51,13 +51,13 @@ runs:
       shell: bash
       # language=bash
       run: |
-        bash "$GITHUB_ACTION_PATH/../../../ci/deploy.sh" build-env
+        bash "$GITHUB_ACTION_PATH/deploy.sh" build-env
         env -u NEON_API_KEY -u GITHUB_TOKEN vercel build --local-config "$VERCEL_LOCAL_CONFIG" --environment "$DEPLOY_TARGET"
     - name: 🗜️ Package build output
       if: steps.resolve.outputs.mode == 'build'
       shell: bash
       # language=bash
-      run: bash "$GITHUB_ACTION_PATH/../../../ci/deploy.sh" pack
+      run: bash "$GITHUB_ACTION_PATH/deploy.sh" pack
     - name: 📤 Upload build output
       id: artifact
       if: steps.resolve.outputs.mode == 'build'
@@ -81,7 +81,7 @@ runs:
       if: steps.resolve.outputs.mode == 'restore'
       shell: bash
       # language=bash
-      run: bash "$GITHUB_ACTION_PATH/../../../ci/deploy.sh" restore
+      run: bash "$GITHUB_ACTION_PATH/deploy.sh" restore
     - name: 🚀 Publish deployment
       id: publish
       shell: bash
@@ -89,7 +89,7 @@ runs:
         BUILD_ARTIFACT_ID: ${{ steps.artifact.outputs.artifact-id }}
         BUILD_ARTIFACT_NAME: rns-${{ env.COMPONENT }}-${{ github.run_id }}-${{ github.run_attempt }}
       # language=bash
-      run: bash "$GITHUB_ACTION_PATH/../../../ci/deploy.sh" publish
+      run: bash "$GITHUB_ACTION_PATH/deploy.sh" publish
     - name: ❌ Report deployment failure
       if: failure()
       shell: bash

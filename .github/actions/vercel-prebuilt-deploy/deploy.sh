@@ -2,9 +2,9 @@
 set -Eeuo pipefail
 umask 077
 CI_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-# shellcheck source=ci/lib.sh
-source "$CI_DIR/lib.sh"
-# shellcheck source=ci/artifacts.sh
+# shellcheck source=.github/actions/_shared/providers.sh
+source "$CI_DIR/../_shared/providers.sh"
+# shellcheck source=.github/actions/vercel-prebuilt-deploy/artifacts.sh
 source "$CI_DIR/artifacts.sh"
 
 resolve_mode() {
@@ -160,18 +160,6 @@ main() {
   trap 'printf "::error title=CI/CD failed::Bash deployment operation failed at line %s.\n" "$LINENO" >&2' ERR
   case ${1:-} in
     plan) plan_application ;;
-    database-plan)
-      local parent; parent=$(neon_parent) || die 'Production-parent resolution failed.'
-      out parent_branch_id "$parent"
-      ;;
-    database-branch)
-      local branch; branch=$(neon_branch true) || die 'Preview-branch preparation failed.'
-      out branch_id "$branch"
-      ;;
-    database-env)
-      local connection; connection=$(neon_connection "${NEON_BRANCH_ID:?}" false)
-      printf 'DATABASE_URL=%s\n' "$connection" >> "${GITHUB_ENV:?}"
-      ;;
     build-env)
       local file; for file in .vercel/.env.*.local; do [[ ! -f "$file" ]] || : > "$file"; done
       ;;
