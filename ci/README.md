@@ -4,13 +4,15 @@
 
 `automatic.yml` contains exactly three ordered calls: database → backend → frontend. All CI/CD orchestration uses Bash, jq, Git, curl, and the provider CLIs; there is no Python controller.
 
-Each reusable workflow calls `.github/actions/component-changes` once, with only `path: database/`, `backend/`, or `frontend/`. The action reads `before`/`after` from `$GITHUB_EVENT_PATH`, runs a NUL-delimited Git diff, and uses jq's `contains` to output `changed=true/false`. It includes additions, deletions, both sides of renames, and every commit in the push. It does not handle event types, resolve branches, accept build overrides, check deployment fingerprints, or implement fallbacks. Missing SHAs/history fail instead of silently meaning "unchanged". Checkouts use `fetch-depth: 0`.
+Each reusable workflow calls `.github/actions/component-changes` once, with only `path: database/`, `backend/`, or `frontend/`. The action reads `before`/`after` from `$GITHUB_EVENT_PATH`, runs a NUL-delimited Git diff, and uses jq's `contains` to output `changed=true/false`. It logs the searched substring, JSON-escaped changed file paths, and match result. It includes additions, deletions, both sides of renames, and every commit in the push. It does not handle event types, resolve branches, accept build overrides, check deployment fingerprints, or implement fallbacks. Missing SHAs/history fail instead of silently meaning "unchanged". The composite owns the `fetch-depth: 0` checkout immediately before the Git diff.
 
 Callers invoke detection for pushes and PR `synchronize` events. Initial PR `opened`/`reopened` events explicitly run full validation/builds; manual runs use their existing build checkbox. These choices are outside the detector. Subsequent decisions use only the latest push, not the cumulative PR diff. Shared CI-only or documentation changes do not implicitly rebuild applications.
 
 The selected frontend production build is compiled once during validation. Vercel packaging reuses that validated output in the same job; standalone `build:vercel` still runs Angular's build first.
 
 `database.yml`, `backend.yml`, and `frontend.yml` are manual-only entry points; each calls only its corresponding reusable workflow. Manual application runs default to a build. Backend credentials are read privately from the matching Neon branch; the frontend reads its matching READY backend deployment through Vercel. Missing dependencies fail with an instruction to run the relevant workflow; no reusable workflow invokes another application's CI/CD. The frontend receives no Neon secrets.
+
+Local actions and reusable workflows use `$/` references, so they resolve to their defining repository's running commit without requiring a workspace checkout. Reusable jobs do not start with checkout: automatic change detection checks out its own Git history, while initial/manual runs fetch source immediately before source-dependent work. The deployment composite runs provider discovery from its downloaded action snapshot, so a manual reuse-only application run needs no checkout. Production-output restoration checks out deployment configuration only after selecting that path, and an existing validated frontend build is never erased by a redundant checkout.
 
 Every target is serialized across automatic/manual runs with a non-cancelling queue. Each application/database also has a shared per-target concurrency group and a GitHub Environment.
 
@@ -23,6 +25,8 @@ Every configured workflow/composite step has an explicit emoji-prefixed name. Th
 - 🔍 change detection; 🧭 path/reference selection; 🔗 resource resolution; 🌱 branch preparation; 🔐 credentials.
 - 🧹 lint; 🎨 formatting; 🧪 tests; 🔨 builds.
 - 🚀 publication/migrations; 📝 reports; ❌ failures.
+
+Selection and resource-resolution steps log their decisions: full build/migration versus reuse, preview branch creation/reuse, selected production parent/database reference, and chosen deployment IDs/URLs. Private connection values and tokens are not printed. CI-script regression tests run locally with `bash ci/test.sh`, not as an extra workflow step.
 
 ## Repository setup
 

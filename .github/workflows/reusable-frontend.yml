@@ -45,11 +45,6 @@ jobs:
       VERCEL_PROJECT_ID: ${{ vars.VERCEL_FRONTEND_PROJECT_ID }}
       VERCEL_LOCAL_CONFIG: frontend/vercel.json
     steps:
-      - name: 📥 Checkout source
-        uses: actions/checkout@v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
       - name: 🔍 Check frontend changes
         id: changes
         if: github.event_name == 'push' || github.event.action == 'synchronize'
@@ -62,8 +57,19 @@ jobs:
           BUILD: ${{ inputs.build || steps.changes.outputs.changed == 'true' || github.event.action == 'opened' || github.event.action == 'reopened' }}
         # language=bash
         run: |
+          if [[ "$BUILD" == true ]]; then
+            echo "Build path: run validation and build the frontend."
+          else
+            echo "Build path: reuse the preview, or restore production output if absent."
+          fi
           echo "build=$BUILD" >> "$GITHUB_OUTPUT"
           echo "BUILD_REQUESTED=$BUILD" >> "$GITHUB_ENV"
+      - name: 📥 Checkout source
+        id: source
+        if: steps.selection.outputs.build == 'true' && steps.changes.outcome == 'skipped'
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
       - name: ⚙️ Set up Node.js and pnpm
         uses: pnpm/setup@v3.1.1
         if: steps.selection.outputs.build == 'true'
@@ -108,6 +114,7 @@ jobs:
         id: deploy
         uses: $/.github/actions/vercel-prebuilt-deploy
         env:
+          RNS_SOURCE_READY: ${{ steps.changes.outcome == 'success' || steps.source.outcome == 'success' }}
           RNS_FRONTEND_BUILD_READY: ${{ steps.selection.outputs.build }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           GITHUB_TOKEN: ${{ github.token }}

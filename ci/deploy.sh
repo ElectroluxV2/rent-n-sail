@@ -25,9 +25,11 @@ resolve_backend_url() {
   required VERCEL_BACKEND_PROJECT_ID
   local project source hostname
   project=$(api vercel GET "/v9/projects/$(uri "$VERCEL_BACKEND_PROJECT_ID")")
+  printf 'Looking up the READY backend for %s (%s).\n' "$DEPLOY_BRANCH" "$DEPLOY_TARGET" >&2
   source=$(vercel_deployments "$VERCEL_BACKEND_PROJECT_ID" | select_deployment "$DEPLOY_BRANCH" "$DEPLOY_TARGET")
   [[ "$source" != null ]] || die 'No matching READY backend exists. Run the backend workflow first.'
   hostname=$(alias_name "$(jq -r '.name' <<< "$project")" "$DEPLOY_BRANCH" "$DEPLOY_TARGET")
+  printf 'Selected backend deployment: %s.\n' "$(jq -r '.uid // .id' <<< "$source")" >&2
   deployment_url "$source" "$hostname" "$VERCEL_BACKEND_PROJECT_ID"
 }
 plan_application() {
@@ -38,6 +40,7 @@ plan_application() {
     *) die 'Unknown application.' ;;
   esac
   project=$(api vercel GET "/v9/projects/$(uri "$project_id")")
+  printf 'Resolving %s for branch %s (%s); build requested: %s.\n' "$COMPONENT" "$DEPLOY_BRANCH" "$DEPLOY_TARGET" "$BUILD_REQUESTED"
   hostname=$(alias_name "$(jq -r '.name' <<< "$project")" "${DEPLOY_BRANCH:?}" "${DEPLOY_TARGET:?}")
   if [[ ${BUILD_REQUESTED:?} != true ]]; then
     history=$(vercel_deployments "$project_id")
@@ -58,8 +61,14 @@ plan_application() {
     local url; url=$(deployment_url "$source" "$hostname" "$project_id")
     jq --arg url "$url" '. + {url:$url}' "$STATE_FILE" | private_json "$STATE_FILE.new"; mv "$STATE_FILE.new" "$STATE_FILE"
     out mode reuse
+    printf 'Existing deployment: %s at %s.\n' "$(jq -r '.uid // .id' <<< "$source")" "$url"
     printf 'Resolved %s: reuse (existing preview left untouched).\n' "$COMPONENT"
     return
+  fi
+  if [[ "$mode" == build ]]; then
+    printf 'Selected a full %s build and publication.\n' "$COMPONENT"
+  else
+    printf 'No matching preview exists; restoring production deployment %s.\n' "$(jq -r '.uid // .id' <<< "$source")"
   fi
   frontend=$(api vercel GET "/v9/projects/$(uri "${VERCEL_FRONTEND_PROJECT_ID:?}")")
   frontend_alias=$(alias_name "$(jq -r '.name' <<< "$frontend")" "$DEPLOY_BRANCH" "$DEPLOY_TARGET")
@@ -106,6 +115,7 @@ publish() {
   branch=$(jq -r '.branch' "$STATE_FILE"); component=$(jq -r '.component' "$STATE_FILE")
   if [[ "$mode" == reuse ]]; then
     id=$(jq -r '.source.uid // .source.id' "$STATE_FILE"); url=$(jq -r '.url' "$STATE_FILE")
+    printf 'Reusing deployment %s at %s; no publication needed.\n' "$id" "$url"
   else
     runtime=$(mktemp "$CI_TMP/runtime.XXXXXX"); jq '.runtime' "$STATE_FILE" > "$runtime"
     inject_runtime .vercel/output "$runtime"
@@ -135,6 +145,7 @@ publish() {
     [[ $(jq -r '.readyState' <<< "$deployment") == READY ]] || die 'The deployment did not reach READY.'
     id=$(jq -r '.id' <<< "$deployment")
     assign_alias "$alias" "$project" "$id"; url="https://$alias"
+    printf 'Published deployment %s at %s.\n' "$id" "$url"
   fi
   jq --arg id "$id" --arg url "$url" '. + {deployment_id:$id,url:$url}' "$STATE_FILE" | private_json "$STATE_FILE.new"
   mv "$STATE_FILE.new" "$STATE_FILE"
@@ -149,8 +160,14 @@ main() {
   trap 'printf "::error title=CI/CD failed::Bash deployment operation failed at line %s.\n" "$LINENO" >&2' ERR
   case ${1:-} in
     plan) plan_application ;;
-    database-plan) out parent_branch_id "$(neon_parent)" ;;
-    database-branch) out branch_id "$(neon_branch true)" ;;
+    database-plan)
+      local parent; parent=$(neon_parent) || die 'Production-parent resolution failed.'
+      out parent_branch_id "$parent"
+      ;;
+    database-branch)
+      local branch; branch=$(neon_branch true) || die 'Preview-branch preparation failed.'
+      out branch_id "$branch"
+      ;;
     database-env)
       local connection; connection=$(neon_connection "${NEON_BRANCH_ID:?}" false)
       printf 'DATABASE_URL=%s\n' "$connection" >> "${GITHUB_ENV:?}"

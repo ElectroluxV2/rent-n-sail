@@ -53,11 +53,6 @@ jobs:
       VERCEL_LOCAL_CONFIG: vercel.json
       UV_PYTHON_PREFERENCE: only-managed
     steps:
-      - name: 📥 Checkout source
-        uses: actions/checkout@v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
       - name: 🔍 Check backend changes
         id: changes
         if: github.event_name == 'push' || github.event.action == 'synchronize'
@@ -70,8 +65,19 @@ jobs:
           BUILD: ${{ inputs.build || steps.changes.outputs.changed == 'true' || github.event.action == 'opened' || github.event.action == 'reopened' }}
         # language=bash
         run: |
+          if [[ "$BUILD" == true ]]; then
+            echo "Build path: run validation and build the backend."
+          else
+            echo "Build path: reuse the preview, or restore production output if absent."
+          fi
           echo "build=$BUILD" >> "$GITHUB_OUTPUT"
           echo "BUILD_REQUESTED=$BUILD" >> "$GITHUB_ENV"
+      - name: 📥 Checkout source
+        id: source
+        if: steps.selection.outputs.build == 'true' && steps.changes.outcome == 'skipped'
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
       - name: ⚙️ Set up uv and Python
         uses: astral-sh/setup-uv@v10.3.2
         if: steps.selection.outputs.build == 'true'
@@ -114,6 +120,7 @@ jobs:
         id: deploy
         uses: $/.github/actions/vercel-prebuilt-deploy
         env:
+          RNS_SOURCE_READY: ${{ steps.changes.outcome == 'success' || steps.source.outcome == 'success' }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
           GITHUB_TOKEN: ${{ github.token }}

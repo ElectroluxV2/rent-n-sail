@@ -14,15 +14,15 @@ concurrency:
 jobs:
   database:
     name: 🗄️ Database
-    uses: ./.github/workflows/reusable-database.yml
+    uses: $/.github/workflows/reusable-database.yml
     secrets: inherit
   backend:
     name: ⚙️ Backend
     needs: database
-    uses: ./.github/workflows/reusable-backend.yml
+    uses: $/.github/workflows/reusable-backend.yml
     secrets: inherit
   frontend:
     name: 🌐 Frontend
     needs: backend
-    uses: ./.github/workflows/reusable-frontend.yml
+    uses: $/.github/workflows/reusable-frontend.yml
     secrets: inherit

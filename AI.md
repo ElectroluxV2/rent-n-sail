@@ -1,5 +1,12 @@
 # AI usage docs
 
+## 2026-10-26 — CI/CD decision logging and checkout placement
+
+- AI assistance: OpenCode (GPT-6.1 Sol) added logging of the searched substring, changed file paths, and match result to the existing Bash/jq detector. Paths are escaped when logged so spaces/newlines remain unambiguous and cannot inject workflow commands. The single `path` input, `changed` output, substring matching, and lack of event handling/fallbacks are unchanged. Added logging and empty-diff regressions. Author attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- Incorporated follow-up requests: removed the `Test CI scripts` workflow step (keeping local tests), logged migration/build decisions and Neon preview/production-parent/database-reference selections, and added equivalent public deployment-resolution/reuse logs. Helper logs go to stderr so resource IDs/URLs returned through stdout remain intact; connection values and tokens remain private.
+- Switched reusable calls to the documented `$/` syntax (composites already use it), moved the Git-history checkout into the changed-path composite, and deferred other checkouts until source/configuration is needed. Deployment scripts run from the downloaded composite snapshot before checkout, allowing manual reuse-only application runs to avoid checkout entirely and preventing a second checkout from deleting a validated frontend build.
+- Local validation includes 40 Bash regression checks for logs, empty/multi-commit diffs, provider output isolation, private credentials, reuse from an empty workspace, deferred checkout, and action/workflow structure. No Python CI/CD code was introduced or executed.
+
 ## 2026-10-26 — Entry workflow and caller job emojis
 
 - AI assistance: OpenCode (GPT-6.1 Sol) prefixed the automatic/manual workflow titles and their caller job names with consistent emojis: 🚀 orchestration, 🗄️ database, ⚙️ backend, and 🌐 frontend. Reusable workflow titles and their inner `Deployment` job labels remain plain; existing step emojis, job IDs, dependencies, and behavior are unchanged. Author attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).

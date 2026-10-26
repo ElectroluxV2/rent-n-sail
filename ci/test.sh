@@ -30,13 +30,21 @@ commit; frontend_head=$(git -C "$TEMP/repo" rev-parse HEAD)
 event() { jq -n --arg before "$1" --arg after "$2" '{before:$before,after:$after}' > "$TEMP/event.json"; }
 detect() {
   : > "$TEMP/outputs"
-  (cd "$TEMP/repo"; GITHUB_EVENT_PATH="$TEMP/event.json" GITHUB_OUTPUT="$TEMP/outputs" bash "$ROOT/.github/actions/component-changes/detect.sh" "$1")
+  (cd "$TEMP/repo"; GITHUB_EVENT_PATH="$TEMP/event.json" GITHUB_OUTPUT="$TEMP/outputs" bash "$ROOT/.github/actions/component-changes/detect.sh" "$1") > "$TEMP/detect.log"
   grep -Fxq "changed=$2" "$TEMP/outputs"
 }
 event "$base" "$frontend_head"
 detect backend/ true; pass 'whole multi-commit push includes earlier backend change'
+grep -Fxq 'Searched path: backend/' "$TEMP/detect.log"
+grep -Fxq 'Changed paths:' "$TEMP/detect.log"
+grep -Fq '"backend/added file"' "$TEMP/detect.log"
+grep -Fq '"frontend/added"' "$TEMP/detect.log"
+grep -Fxq 'Match: true' "$TEMP/detect.log"
+pass 'detector logs the searched path, changed paths, and match result'
 detect frontend/ true; pass 'whole push includes newest frontend change'
 detect database/ false; pass 'unaffected path is false'
+grep -Fxq 'Searched path: database/' "$TEMP/detect.log"
+grep -Fxq 'Match: false' "$TEMP/detect.log"
 event "$backend_head" "$frontend_head"
 detect backend/ false; pass 'latest frontend-only push does not rebuild earlier PR backend changes'
 detect 'end/add' true; pass 'input is a substring, not a hard-coded component or prefix'
@@ -50,6 +58,12 @@ detect backend/ true; detect frontend/ true; pass 'both sides of renames are det
 printf 'new\n' > "$TEMP/repo/backend/line"$'\n''break'; commit
 event "$renamed" "$(git -C "$TEMP/repo" rev-parse HEAD)"
 detect backend/ true; pass 'NUL-delimited paths preserve newline filenames'
+grep -Fq '"backend/line\nbreak"' "$TEMP/detect.log"
+event "$(git -C "$TEMP/repo" rev-parse HEAD)" "$(git -C "$TEMP/repo" rev-parse HEAD)"
+detect backend/ false
+grep -Fxq '[]' "$TEMP/detect.log"
+grep -Fxq 'Match: false' "$TEMP/detect.log"
+pass 'an empty diff logs an empty path array and a false result'
 printf '{}\n' > "$TEMP/event.json"
 expect_failure detect backend/ false; pass 'missing event fields fail without fallback'
 
@@ -80,13 +94,66 @@ pass 'publishing reuse is read-only: no clone, CLI, alias write, or runtime rebi
     printf '{"branches":[{"id":"existing","name":"preview/branch"}]}\n'
   }
   export NEON_PROJECT_ID=project DEPLOY_BRANCH=branch DEPLOY_TARGET=preview
-  [[ $(neon_branch true) == existing ]]
+  [[ $(neon_branch true 2> "$TEMP/neon-reuse.log") == existing ]]
+  grep -Fxq 'Reusing existing Neon preview: preview/branch (existing). No branch created.' "$TEMP/neon-reuse.log"
 )
 pass 'existing database preview is also a no-op'
+(
+  api() {
+    if [[ "$2" == GET ]]; then
+      printf '{"branches":[{"id":"parent","name":"main","default":true}]}\n'
+    else
+      jq -e '.branch == {name:"preview/branch",parent_id:"parent"}' "$4" >/dev/null
+      printf '{"branch":{"id":"created"}}\n'
+    fi
+  }
+  export NEON_PROJECT_ID=project DEPLOY_BRANCH=branch DEPLOY_TARGET=preview
+  unset NEON_PARENT_BRANCH_ID
+  [[ $(neon_branch true 2> "$TEMP/neon-create.log") == created ]]
+  grep -Fxq 'Production parent selector: project default' "$TEMP/neon-create.log"
+  grep -Fxq 'Selected production parent: parent' "$TEMP/neon-create.log"
+  grep -Fxq 'No preview/branch branch exists. Creating it from parent.' "$TEMP/neon-create.log"
+  grep -Fxq 'Created Neon preview: preview/branch (created).' "$TEMP/neon-create.log"
+)
+pass 'new preview and default-parent decisions are logged without contaminating the branch output'
+(
+  api() { printf '{"branches":[{"id":"default","default":true},{"id":"selected","name":"stable"}]}\n'; }
+  export NEON_PROJECT_ID=project NEON_PARENT_BRANCH_ID=stable
+  [[ $(neon_parent 2> "$TEMP/neon-parent.log") == selected ]]
+  grep -Fxq 'Production parent selector: stable' "$TEMP/neon-parent.log"
+  grep -Fxq 'Selected production parent: selected' "$TEMP/neon-parent.log"
+)
+pass 'configured production-parent selection is logged separately from its ID output'
+(
+  # Invoked through expect_failure's resolver argument.
+  # shellcheck disable=SC2329
+  api() { printf '{"branches":[]}\n'; }
+  export NEON_PROJECT_ID=project
+  unset NEON_PARENT_BRANCH_ID
+  expect_failure neon_parent
+)
+pass 'decision logging cannot turn an invalid production parent into a successful lookup'
+(
+  api() { printf '{"uri":"postgresql://private-fixture"}\n'; }
+  export NEON_PROJECT_ID=project GITHUB_ACTIONS=false
+  [[ $(neon_connection branch true 2> "$TEMP/neon-connection.log") == postgresql://private-fixture ]]
+  grep -Fxq 'Resolving private database connection for branch branch (pooled=true).' "$TEMP/neon-connection.log"
+  if grep -Fq 'private-fixture' "$TEMP/neon-connection.log"; then die 'Connection value leaked into logs.'; fi
+)
+pass 'connection resolution logs only the branch and pooling choice, never credentials'
+(
+  # Invoked through expect_failure's resolver argument.
+  # shellcheck disable=SC2329
+  api() { printf '{}\n'; }
+  export NEON_PROJECT_ID=project GITHUB_ACTIONS=false
+  expect_failure neon_connection branch true
+)
+pass 'missing connection values still fail instead of producing successful log-only output'
 
 (
   export COMPONENT=backend BUILD_REQUESTED=false DEPLOY_BRANCH=branch DEPLOY_TARGET=preview
   export VERCEL_BACKEND_PROJECT_ID=backend VERCEL_FRONTEND_PROJECT_ID=frontend STATE_FILE="$TEMP/planned.json"
+  mkdir "$TEMP/no-checkout-backend"; cd "$TEMP/no-checkout-backend"
   api() {
     [[ "$1" == vercel && "$2" == GET ]] || die 'Reuse must only read provider metadata.'
     case "$3" in
@@ -104,6 +171,7 @@ pass 'backend reuse does not resolve other applications or runtime dependencies'
 (
   export COMPONENT=frontend BUILD_REQUESTED=false DEPLOY_BRANCH=branch DEPLOY_TARGET=preview
   export VERCEL_FRONTEND_PROJECT_ID=frontend STATE_FILE="$TEMP/frontend-plan.json"
+  mkdir "$TEMP/no-checkout-frontend"; cd "$TEMP/no-checkout-frontend"
   unset VERCEL_BACKEND_PROJECT_ID NEON_API_KEY NEON_PROJECT_ID
   api() {
     [[ "$1" == vercel && "$2" == GET ]] || die 'Reuse must only read its own metadata.'
@@ -218,4 +286,14 @@ for workflow in backend frontend; do
   done
 done
 pass 'matching application step purposes use identical emoji and labels'
+if grep -RqE 'run: bash ci/test\.sh|uses: \./' "$ROOT/.github"; then die 'CI self-test step or old local uses syntax found.'; fi
+for workflow in database backend frontend; do
+  first=$(awk '/^    steps:/ {getline; print; exit}' "$ROOT/.github/workflows/reusable-$workflow.yml")
+  [[ "$first" == *'🔍 Check '*' changes' ]]
+done
+grep -Fq 'uses: actions/checkout@v7.0.1' "$ROOT/.github/actions/component-changes/action.yml"
+grep -Fq 'fetch-depth: 0' "$ROOT/.github/actions/component-changes/action.yml"
+grep -Fq "if: steps.resolve.outputs.mode != 'reuse' && env.RNS_SOURCE_READY != 'true'" "$ROOT/.github/actions/vercel-prebuilt-deploy/action.yml"
+grep -Fq "bash \"\$GITHUB_ACTION_PATH/../../../ci/deploy.sh\" plan" "$ROOT/.github/actions/vercel-prebuilt-deploy/action.yml"
+pass 'checkout is owned by the Git detector or deferred until source/configuration is needed'
 printf '%s Bash CI/CD checks passed.\n' "$passed"

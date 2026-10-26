@@ -103,30 +103,43 @@ assign_alias() {
 }
 neon_parent() {
   required NEON_PROJECT_ID
-  api neon GET "/projects/$(uri "$NEON_PROJECT_ID")/branches" |
+  local parent
+  printf 'Production parent selector: %s\n' "${NEON_PARENT_BRANCH_ID:-project default}" >&2
+  parent=$(api neon GET "/projects/$(uri "$NEON_PROJECT_ID")/branches" |
     jq -er --arg selected "${NEON_PARENT_BRANCH_ID:-}" '
       [.branches[] | select(if $selected == "" then .default else .id == $selected or .name == $selected end)]
-      | if length == 1 then .[0].id else error("Ambiguous Neon parent; configure NEON_PARENT_BRANCH_ID") end'
+      | if length == 1 then .[0].id else error("Ambiguous Neon parent; configure NEON_PARENT_BRANCH_ID") end') || die 'Could not resolve the production parent.'
+  printf 'Selected production parent: %s\n' "$parent" >&2
+  printf '%s\n' "$parent"
 }
 neon_branch() {
-  local create=${1:-false} branches matches parent payload result
+  local create=${1:-false} branches matches parent payload result branch
   if [[ ${DEPLOY_TARGET:?} == production ]]; then neon_parent; return; fi
   branches=$(api neon GET "/projects/$(uri "$NEON_PROJECT_ID")/branches")
   matches=$(jq -c --arg name "preview/${DEPLOY_BRANCH:?}" '[.branches[] | select(.name == $name)]' <<< "$branches")
   case $(jq length <<< "$matches") in
-    1) jq -r '.[0].id' <<< "$matches"; return ;;
+    1)
+      branch=$(jq -r '.[0].id' <<< "$matches")
+      printf 'Reusing existing Neon preview: preview/%s (%s). No branch created.\n' "$DEPLOY_BRANCH" "$branch" >&2
+      printf '%s\n' "$branch"; return
+      ;;
     0) [[ "$create" == true ]] || die 'No matching Neon preview exists. Run the database workflow first.' ;;
     *) die 'The Neon preview name is ambiguous.' ;;
   esac
   parent=$(neon_parent); payload=$(mktemp "$CI_TMP/neon.XXXXXX")
+  printf 'No preview/%s branch exists. Creating it from %s.\n' "$DEPLOY_BRANCH" "$parent" >&2
   jq -n --arg name "preview/$DEPLOY_BRANCH" --arg parent "$parent" \
     '{branch:{name:$name,parent_id:$parent},endpoints:[{type:"read_write"}]}' > "$payload"
   result=$(api neon POST "/projects/$(uri "$NEON_PROJECT_ID")/branches" "$payload")
-  jq -er '.branch.id' <<< "$result"
+  branch=$(jq -er '.branch.id' <<< "$result") || die 'Neon did not return a created branch ID.'
+  printf 'Created Neon preview: preview/%s (%s).\n' "$DEPLOY_BRANCH" "$branch" >&2
+  printf '%s\n' "$branch"
 }
 neon_connection() {
   local result value
+  printf 'Resolving private database connection for branch %s (pooled=%s).\n' "$1" "$2" >&2
   result=$(api neon GET "/projects/$(uri "$NEON_PROJECT_ID")/connection_uri?branch_id=$(uri "$1")&database_name=$(uri "${NEON_DATABASE_NAME:-neondb}")&role_name=$(uri "${NEON_ROLE_NAME:-neondb_owner}")&pooled=$2")
-  value=$(jq -er '.uri' <<< "$result"); mask "$value"
+  value=$(jq -er '.uri' <<< "$result") || die 'Neon did not return a database connection.'
+  mask "$value"
   printf '%s\n' "$value"
 }
