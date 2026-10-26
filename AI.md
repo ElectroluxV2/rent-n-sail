@@ -1,5 +1,9 @@
 # AI usage docs
 
+## 2026-10-26 — Explicit Ubuntu 26.04 runners
+
+- AI assistance: OpenCode (GPT-6.1 Sol) pinned the database/backend/frontend reusable jobs to `runs-on: ubuntu-26.04`, replacing `ubuntu-latest` to avoid the Ubuntu label-migration notices. Confirmed the hosted-runner label against GitHub's runner-images documentation. Author attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`). No other workflow behavior changed.
+
 ## 2026-10-26 — Workflow UI naming options
 
 - AI assistance: OpenCode (GPT-6.1 Sol) inspected the caller/reusable job names and proposed concise UI naming schemes. Author attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`). The repeated `backend / backend` label comes from the caller job and the job inside the reusable workflow, not the reusable workflow's top-level name. Recommended explicit job display names while retaining job IDs and dependency/output references. No workflow names were changed pending the user's choice.

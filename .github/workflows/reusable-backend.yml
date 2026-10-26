@@ -29,7 +29,7 @@ jobs:
   backend:
     name: Deployment
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     concurrency:
       group: backend-${{ (inputs.target || (github.event_name == 'push' && 'production' || 'preview')) == 'production' && 'production' || (inputs.branch || github.head_ref || github.ref_name) }}
       cancel-in-progress: false
