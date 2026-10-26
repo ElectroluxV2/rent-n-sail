@@ -63,12 +63,6 @@ jobs:
           BUILD: ${{ inputs.build || steps.changes.outputs.changed == 'true' || github.event.action == 'opened' || github.event.action == 'reopened' }}
         # language=bash
         run: echo "build=$BUILD" >> "$GITHUB_OUTPUT"
-      - name: Resolve production parent
-        id: plan
-        env:
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-        # language=bash
-        run: bash ci/deploy.sh database-plan
       - name: Ensure copy-on-write preview branch
         id: branch
         if: env.DEPLOY_TARGET == 'preview'
@@ -76,6 +70,13 @@ jobs:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
         # language=bash
         run: bash ci/deploy.sh database-branch
+      - name: Resolve production parent
+        id: plan
+        if: env.DEPLOY_TARGET == 'production' || steps.selection.outputs.build == 'true'
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        # language=bash
+        run: bash ci/deploy.sh database-plan
       - name: Select database reference
         id: reference
         env:
@@ -111,7 +112,7 @@ jobs:
         # language=bash
         run: uv run --directory database --locked alembic upgrade head
       - name: Comment schema changes on the PR
-        if: github.event_name == 'pull_request' && env.DEPLOY_TARGET == 'preview'
+        if: steps.selection.outputs.build == 'true' && github.event_name == 'pull_request' && env.DEPLOY_TARGET == 'preview'
         uses: neondatabase/schema-diff-action@v1.0.1
         with:
           api_key: ${{ secrets.NEON_API_KEY }}

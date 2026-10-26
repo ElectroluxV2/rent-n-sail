@@ -48,14 +48,25 @@ plan_application() {
   source=null
   [[ "$mode" != reuse ]] || source=$existing
   [[ "$mode" != restore ]] || source=$production
-  # Resolve only public URL metadata on reuse; do not rotate credentials, build,
-  # clone, rebind, or assign aliases to an already-existing preview.
+  jq -n --arg component "$COMPONENT" --arg project "$project_id" --arg branch "$DEPLOY_BRANCH" \
+    --arg target "$DEPLOY_TARGET" --arg alias "$hostname" --arg mode "$mode" --argjson source "$source" \
+    '{component:$component,project_id:$project,branch:$branch,target:$target,alias:$alias,mode:$mode,source:$source,runtime:{}}' |
+    private_json "${STATE_FILE:?}"
+  # Existing preview: report it and stop. No other application, dependency,
+  # runtime configuration, toolchain, or deployment needs to be touched.
+  if [[ "$mode" == reuse ]]; then
+    local url; url=$(deployment_url "$source" "$hostname" "$project_id")
+    jq --arg url "$url" '. + {url:$url}' "$STATE_FILE" | private_json "$STATE_FILE.new"; mv "$STATE_FILE.new" "$STATE_FILE"
+    out mode reuse
+    printf 'Resolved %s: reuse (existing preview left untouched).\n' "$COMPONENT"
+    return
+  fi
   frontend=$(api vercel GET "/v9/projects/$(uri "${VERCEL_FRONTEND_PROJECT_ID:?}")")
   frontend_alias=$(alias_name "$(jq -r '.name' <<< "$frontend")" "$DEPLOY_BRANCH" "$DEPLOY_TARGET")
   runtime=$(mktemp "$CI_TMP/runtime.XXXXXX")
   if [[ "$COMPONENT" == backend ]]; then
     alias_record=$(checked_alias "$frontend_alias" "$VERCEL_FRONTEND_PROJECT_ID")
-    if [[ "$mode" != reuse && "$DEPLOY_TARGET" == preview && "$alias_record" == null ]]; then
+    if [[ "$DEPLOY_TARGET" == preview && "$alias_record" == null ]]; then
       # Reserve the public hostname before trusting it as a CORS origin. This
       # provider URL reservation never invokes frontend CI or builds/deploys code.
       stable=$(vercel_deployments "$VERCEL_FRONTEND_PROJECT_ID" | select_deployment "$DEPLOY_BRANCH" production)
@@ -63,25 +74,17 @@ plan_application() {
       assign_alias "$frontend_alias" "$VERCEL_FRONTEND_PROJECT_ID" "$(jq -r '.uid // .id' <<< "$stable")"
     fi
     jq -n --arg origin "https://$frontend_alias" '{CORS_ALLOWED_ORIGINS:$origin}' > "$runtime"
-    if [[ "$mode" != reuse ]]; then
-      branch=$(neon_branch false)
-      DATABASE_URL=$(neon_connection "$branch" true); export DATABASE_URL
-      jq '. + {DATABASE_URL:env.DATABASE_URL}' "$runtime" | private_json "$runtime.new"
-      mv "$runtime.new" "$runtime"
-    fi
+    branch=$(neon_branch false)
+    DATABASE_URL=$(neon_connection "$branch" true); export DATABASE_URL
+    jq '. + {DATABASE_URL:env.DATABASE_URL}' "$runtime" | private_json "$runtime.new"
+    mv "$runtime.new" "$runtime"
   else
     local backend; backend=$(resolve_backend_url)
     jq -n --arg backend "$backend" --arg frontend "https://$frontend_alias" '{BACKEND_URL:$backend,FRONTEND_URL:$frontend}' > "$runtime"
   fi
-  jq -n --arg component "$COMPONENT" --arg project "$project_id" --arg branch "$DEPLOY_BRANCH" \
-    --arg target "$DEPLOY_TARGET" --arg alias "$hostname" --arg mode "$mode" \
-    --argjson source "$source" --slurpfile runtime "$runtime" \
-    '{component:$component,project_id:$project,branch:$branch,target:$target,alias:$alias,mode:$mode,source:$source,runtime:$runtime[0]}' |
-    private_json "${STATE_FILE:?}"
-  if [[ "$mode" == reuse ]]; then
-    local url; url=$(deployment_url "$source" "$hostname" "$project_id")
-    jq --arg url "$url" '. + {url:$url}' "$STATE_FILE" | private_json "$STATE_FILE.new"; mv "$STATE_FILE.new" "$STATE_FILE"
-  elif [[ "$mode" == restore ]]; then
+  jq --slurpfile runtime "$runtime" '.runtime=$runtime[0]' "$STATE_FILE" | private_json "$STATE_FILE.new"
+  mv "$STATE_FILE.new" "$STATE_FILE"
+  if [[ "$mode" == restore ]]; then
     id=$(jq -r '.meta.rnsArtifactId // empty' <<< "$source")
     [[ -n "$id" ]] || die 'Production has no retained prebuilt output. Build production once after merge; never silently rebuild unchanged PR source.'
     artifact=$(api github GET "/repos/${GITHUB_REPOSITORY:?}/actions/artifacts/$(uri "$id")")

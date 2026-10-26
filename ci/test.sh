@@ -91,8 +91,6 @@ pass 'existing database preview is also a no-op'
     [[ "$1" == vercel && "$2" == GET ]] || die 'Reuse must only read provider metadata.'
     case "$3" in
       /v9/projects/backend) printf '{"id":"backend","name":"backend"}\n' ;;
-      /v9/projects/frontend) printf '{"id":"frontend","name":"frontend"}\n' ;;
-      /v4/aliases/frontend-*) printf '{"projectId":"frontend","deploymentId":"front"}\n' ;;
       /v4/aliases/backend-*) printf '{"projectId":"backend","deploymentId":"existing"}\n' ;;
       *) die 'Unexpected provider request.' ;;
     esac
@@ -100,9 +98,26 @@ pass 'existing database preview is also a no-op'
   vercel_deployments() { printf '[{"id":"existing","state":"READY","url":"existing.test","meta":{"githubCommitRef":"branch"}}]\n'; }
   neon_branch() { die 'Existing backend preview must not resolve or change its database.'; }
   plan_application > /dev/null
-  jq -e '.mode == "reuse" and (.runtime | has("DATABASE_URL") | not)' "$STATE_FILE" >/dev/null
+  jq -e '.mode == "reuse" and .runtime == {}' "$STATE_FILE" >/dev/null
 )
-pass 'existing backend is found before credentials or production artifacts are resolved'
+pass 'backend reuse does not resolve other applications or runtime dependencies'
+(
+  export COMPONENT=frontend BUILD_REQUESTED=false DEPLOY_BRANCH=branch DEPLOY_TARGET=preview
+  export VERCEL_FRONTEND_PROJECT_ID=frontend STATE_FILE="$TEMP/frontend-plan.json"
+  unset VERCEL_BACKEND_PROJECT_ID NEON_API_KEY NEON_PROJECT_ID
+  api() {
+    [[ "$1" == vercel && "$2" == GET ]] || die 'Reuse must only read its own metadata.'
+    case "$3" in
+      /v9/projects/frontend) printf '{"id":"frontend","name":"frontend"}\n' ;;
+      /v4/aliases/frontend-*) printf '{"projectId":"frontend","deploymentId":"existing"}\n' ;;
+      *) die 'Existing frontend must not resolve backend or Neon dependencies.' ;;
+    esac
+  }
+  vercel_deployments() { printf '[{"id":"existing","state":"READY","url":"existing.test","meta":{"githubCommitRef":"branch"}}]\n'; }
+  plan_application > /dev/null
+  jq -e '.mode == "reuse" and .runtime == {}' "$STATE_FILE" >/dev/null
+)
+pass 'frontend reuse requires no backend/Neon lookup or credentials'
 (
   export COMPONENT=backend BUILD_REQUESTED=false DEPLOY_BRANCH=branch DEPLOY_TARGET=preview
   export VERCEL_BACKEND_PROJECT_ID=backend VERCEL_FRONTEND_PROJECT_ID=frontend STATE_FILE="$TEMP/restored-plan.json"
@@ -189,4 +204,9 @@ pass 'runtime diagnostics redact tokens and database URLs'
 if grep -qE 'uses:.*reusable-(database|backend|frontend)' "$ROOT"/.github/workflows/reusable-*.yml; then die 'Nested application workflow call found.'; fi
 if grep -R -nE 'python3|ci/deploy\.py|unittest' "$ROOT/.github"; then die 'Python CI/CD glue found.'; fi
 pass 'three detector calls, exactly three automatic jobs, no nested workflows or Python glue'
+for step in 'Set up cached Vercel CLI' 'Verify live application and dependency wiring'; do
+  condition=$(awk -v name="$step" 'index($0,"- name: " name) {getline; print}' "$ROOT/.github/actions/vercel-prebuilt-deploy/action.yml")
+  [[ "$condition" == "      if: steps.resolve.outputs.mode != 'reuse'" ]]
+done
+pass 'reuse skips deployment toolchain setup and deployment smoke tests'
 printf '%s Bash CI/CD checks passed.\n' "$passed"

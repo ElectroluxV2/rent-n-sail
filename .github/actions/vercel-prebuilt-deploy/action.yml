@@ -20,6 +20,7 @@ runs:
         } >> "$GITHUB_ENV"
         bash ci/deploy.sh plan
     - name: Set up cached Vercel CLI
+      if: steps.resolve.outputs.mode != 'reuse'
       uses: $/.github/actions/setup-vercel-cli
       env:
         # Security: dependency installation must not receive deployment credentials.
@@ -81,6 +82,7 @@ runs:
       # language=bash
       run: bash ci/deploy.sh publish
     - name: Verify live application and dependency wiring
+      if: steps.resolve.outputs.mode != 'reuse'
       shell: bash
       # language=bash
       run: bash ci/deploy.sh smoke
