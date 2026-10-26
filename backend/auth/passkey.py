@@ -1,10 +1,7 @@
-import logging
 from typing import Any, NotRequired, TypedDict
 
 from authtuna.core.database import PasskeyCredential
 from authtuna.integrations import auth_service
-
-logger = logging.getLogger(__name__)
 
 
 class PasskeyAssertion(TypedDict):

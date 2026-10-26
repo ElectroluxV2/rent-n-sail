@@ -1,4 +1,4 @@
-import logging
+import os
 from pathlib import Path
 
 import uvicorn
@@ -7,12 +7,17 @@ from fastapi import APIRouter, FastAPI
 from scalar_fastapi import add_scalar_reference
 
 init_settings(
-    API_BASE_URL="http://localhost:8000",
-    DEFAULT_DATABASE_URI=f"sqlite+aiosqlite:///{Path(__file__).with_name('authtuna_dev.db')}",
-    WEBAUTHN_RP_ID="localhost",
+    API_BASE_URL=os.getenv("API_BASE_URL", "http://localhost:8000"),
+    DEFAULT_DATABASE_URI=os.getenv(
+        "DEFAULT_DATABASE_URI",
+        f"sqlite+aiosqlite:///{Path(__file__).with_name('authtuna_dev.db')}",
+    ),
+    WEBAUTHN_RP_ID=os.getenv("WEBAUTHN_RP_ID", "localhost"),
     WEBAUTHN_RP_NAME="Rent n Sail",
-    WEBAUTHN_ORIGIN="http://localhost:4200",
-    FERNET_KEYS=["MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA="],
+    WEBAUTHN_ORIGIN=os.getenv("WEBAUTHN_ORIGIN", "http://localhost:4200"),
+    FERNET_KEYS=os.getenv(
+        "FERNET_KEYS", ["MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA="]
+    ),
     SESSION_SECURE=False,
     MFA_ENABLED=False,
     PASSKEYS_ENABLED=True,
@@ -25,8 +30,6 @@ init_settings(
 from auth.login.router import router as login_router  # noqa: I001, E402
 from auth.register.router import router as register_router  # noqa: I001, E402
 
-logger = logging.getLogger(__name__)
-
 app = FastAPI()
 init_app(app)
 main_router = APIRouter()
@@ -37,6 +40,7 @@ app.include_router(main_router, prefix="/api")
 add_scalar_reference(app)
 
 
+@main_router.get("/")
 @main_router.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}

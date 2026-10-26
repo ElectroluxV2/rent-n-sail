@@ -52,6 +52,16 @@
 - AI assistance: OpenAI GPT-6 Luna recommended keeping shared WebAuthn `TypedDict` payloads in `auth/common/passkey_types.py`, endpoint-specific Pydantic request models within each vertical slice, and router aggregation separate from shared types.
 - Author attribution: `@Buzeqq` (verified with `gh api user`).
 
+## 2026-10-26 — Ruff line wrapping explanation
+
+- AI assistance: OpenAI GPT-6 Luna explained Ruff's parenthesized line wrap around the 89-character assignment; the configured default line length is 88 characters.
+- Author attribution: `@Buzeqq` (verified with `gh api user`).
+
+## 2026-10-26 — Passkey sign-counter update explanation
+
+- AI assistance: OpenAI GPT-6 Luna inspected AuthTuna's `update_credential_on_login` and explained that it persists the WebAuthn signature counter and last-used time after successful authentication.
+- Author attribution: `@Buzeqq` (verified with `gh api user`).
+
 ## 2026-10-24 — WebAuth passkey flow
 
 - AI assistance: OpenAI GPT-5.6 Terra generated the Angular `WebAuthFlowComponent` with the pnpm Angular CLI and initially added custom in-memory WebAuthn endpoints. At the user's request, those endpoints were replaced with AuthTuna's built-in passkey routes, account signup, and SQLite persistence.

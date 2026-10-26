@@ -18,7 +18,9 @@ interface BackendHello {
 export class App {
   protected readonly title = signal('frontend');
   private readonly backendApiUrl = inject(BACKEND_API_URL);
-  protected readonly backendHello = httpResource<BackendHello>(() => this.backendApiUrl + "/health");
+  protected readonly backendHello = httpResource<BackendHello>(
+    () => this.backendApiUrl + '/health',
+  );
   protected readonly checkForm = form(signal({}), {
     submission: {
       action: async () => {

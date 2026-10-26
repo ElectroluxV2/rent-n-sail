@@ -1,9 +1,10 @@
 import logging
 import secrets
+from typing import Annotated
 
 from authtuna.helpers import create_session_and_set_cookie
 from authtuna.integrations import auth_service
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, Header, HTTPException, Request, Response
 
 from auth.passkey import (
     PASSKEY_FLOW_USER_ID_SESSION_KEY,
@@ -19,7 +20,7 @@ router = APIRouter(prefix="/passkey")
 logger = logging.getLogger(__name__)
 
 
-@router.post("/init")
+@router.post("/begin")
 async def register_init(
     payload: PasskeyRegistrationInitRequest,
     request: Request,
@@ -57,7 +58,7 @@ async def register_init(
     )
     request.session[PASSKEY_REGISTER_CHALLENGE_SESSION_KEY] = challenge
     logger.info("Passkey registration options generated")
-    return {"options": options}
+    return options
 
 
 @router.post("/complete")
@@ -65,6 +66,7 @@ async def register_complete(
     payload: PasskeyRegistrationCompleteRequest,
     request: Request,
     response: Response,
+    user_agent: Annotated[str | None, Header()] = None,
 ) -> dict[str, str]:
     challenge = request.session.pop(PASSKEY_REGISTER_CHALLENGE_SESSION_KEY, None)
     user_id = request.session.get(PASSKEY_FLOW_USER_ID_SESSION_KEY)
@@ -73,6 +75,9 @@ async def register_complete(
             "Passkey registration rejected: challenge or pending user missing"
         )
         raise HTTPException(400, "Passkey registration expired. Start again.")
+    if user_agent is None:
+        logger.warning("Passkey registration rejected: user_agent missing")
+        raise HTTPException(400, "Passkey registration failed. Start again.")
 
     try:
         credential_data = verify_registration(
@@ -81,7 +86,7 @@ async def register_complete(
         await auth_service.passkeys.save_new_credential(
             user_id=user_id,
             cred_data=credential_data,
-            nickname="Passkey",
+            nickname=user_agent,
         )
         user = await auth_service.users.get_by_id(user_id)
         if user is None:
@@ -90,7 +95,7 @@ async def register_complete(
             user, request, response, auth_service.db_manager.get_db()
         )
         request.session.pop(PASSKEY_FLOW_USER_ID_SESSION_KEY, None)
-    except ValueError as error:
+    except Exception as error:
         logger.exception("Passkey registration verification failed", exc_info=error)
         auth_service.users.delete(user_id)  # clean up failed registration process
         raise HTTPException(400, "Passkey registration failed.") from None

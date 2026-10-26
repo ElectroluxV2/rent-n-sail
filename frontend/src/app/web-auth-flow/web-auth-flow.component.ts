@@ -32,9 +32,10 @@ interface AuthTunaRegistrationOptions {
 }
 
 interface PasskeyFlowResponse {
-  status?: 'logged_in' | 'registered';
-  options?: AuthTunaAuthenticationOptions | AuthTunaRegistrationOptions;
+  username: string;
 }
+
+type PasskeyOptionsResponse = AuthTunaAuthenticationOptions | AuthTunaRegistrationOptions;
 
 @Component({
   imports: [FormsModule],
@@ -65,15 +66,15 @@ export class WebAuthFlowComponent {
     this.localPasskeyDetected.set(null);
     this.isStarting.set(true);
     try {
-      const initial = await this.sendFlow('login/passkey', {});
-      if (!initial.options) {
+      const initial = await this.loginInit();
+      if (!initial) {
         throw new Error('The passkey flow returned an unexpected response.');
       }
 
       let credential: Credential | null;
       try {
         credential = await navigator.credentials.get({
-          publicKey: this.authenticationOptions(initial.options as AuthTunaAuthenticationOptions),
+          publicKey: this.authenticationOptions(initial as AuthTunaAuthenticationOptions),
         });
       } catch (error: unknown) {
         if (error instanceof DOMException && error.name === 'NotAllowedError') {
@@ -94,13 +95,10 @@ export class WebAuthFlowComponent {
       this.localPasskeyDetected.set(true);
 
       try {
-        const result = await this.sendFlow('login/passkey', {
+        const result = await this.sendFlow('login/passkey/complete', {
           assertion: this.getAssertion(credential),
         });
-        if (result.status !== 'logged_in') {
-          throw new Error('The saved passkey could not sign you in.');
-        }
-        this.status.set('Signed in with your passkey.');
+        this.status.set(`Welcome ${result.username}.`);
       } catch (error: unknown) {
         if (error instanceof HttpErrorResponse && error.status === 404) {
           this.canCreateAccount.set(true);
@@ -126,15 +124,15 @@ export class WebAuthFlowComponent {
     this.isStarting.set(true);
     this.error.set(null);
     try {
-      const result = await this.sendFlow('register/passkey/init', {
+      const result = await this.registerInit({
         username: this.username.trim(),
       });
-      if (!result.options) {
+      if (!result) {
         throw new Error('The registration flow returned an unexpected response.');
       }
 
       const credential = await navigator.credentials.create({
-        publicKey: this.registrationOptions(result.options as AuthTunaRegistrationOptions),
+        publicKey: this.registrationOptions(result as AuthTunaRegistrationOptions),
       });
       if (!(credential instanceof PublicKeyCredential)) {
         throw new Error('Passkey creation was cancelled.');
@@ -153,6 +151,18 @@ export class WebAuthFlowComponent {
 
   private sendFlow(path: string, payload: Record<string, unknown>): Promise<PasskeyFlowResponse> {
     return firstValueFrom(this.http.post<PasskeyFlowResponse>(this.endpoint(path), payload));
+  }
+
+  private loginInit(): Promise<PasskeyOptionsResponse> {
+    return firstValueFrom(
+      this.http.get<PasskeyOptionsResponse>(this.endpoint('login/passkey/begin')),
+    );
+  }
+
+  private registerInit(payload: Record<string, unknown>): Promise<PasskeyOptionsResponse> {
+    return firstValueFrom(
+      this.http.post<PasskeyOptionsResponse>(this.endpoint('register/passkey/begin'), payload),
+    );
   }
 
   private endpoint(path: string): string {
