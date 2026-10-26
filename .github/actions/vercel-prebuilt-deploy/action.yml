@@ -6,6 +6,7 @@ runs:
     - name: Prepare Vercel CLI cache
       id: vercel_cli
       shell: bash
+      # language=bash
       run: |
         node_version=$(node --version)
         pnpm_version=$(pnpm --version)
@@ -25,6 +26,7 @@ runs:
     - name: Install Vercel CLI with pnpm
       if: steps.vercel_cli_cache.outputs.cache-hit != 'true'
       shell: bash
+      # language=bash
       run: |
         mkdir -p "$RUNNER_TOOL_CACHE/vercel-cli"
         # Keep package links inside the cached installation.
@@ -45,6 +47,7 @@ runs:
     - name: Build and deploy prebuilt output
       shell: bash
       working-directory: ${{ github.workspace }}
+      # language=bash
       run: |
         config_args=()
         if [[ -n "$VERCEL_LOCAL_CONFIG" ]]; then

@@ -1,5 +1,19 @@
 # AI usage docs
 
+## 2026-10-26 — Personal commit signing for this clone
+
+- AI assistance: OpenCode (GPT-6.1 Sol) configured this clone to sign commits with the author's personal GitHub identity and SSH signing key.
+- Author attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- Set repository-local personal identity and SSH signing using `electroluxv2@gmail.com` and `~/.ssh/github-personal.pub`, with commit signing enabled and a clone-local allowed-signers file. Global Git configuration is unchanged.
+- Verification: confirmed the personal key is registered with GitHub for signing and the personal email was used by an earlier Verified commit. Created an unreferenced signed test commit and verified its signature, key fingerprint, author email, and committer email without changing branch history.
+- Follow-up AI assistance: prepared the two recent commits for re-signing with personal author and committer attribution and a force-with-lease push, as requested.
+
+## 2026-10-26 — YAML language injection comments
+
+- AI assistance: OpenCode (GPT-6.1 Sol) checked all YAML files for embedded shell scripts and added the existing `# language=bash` injection comment to the three unannotated `run` blocks in the shared Vercel deployment action. Workflow scripts already had the comments; executable content is unchanged.
+- Author attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- Follow-up AI assistance: prepared the language injection comments for commit and push to `cd` at the author's request, using the personal SSH remote.
+
 ## 2026-10-26 — Installed Vercel CLI caching
 
 - AI assistance: OpenCode (GPT-6.1 Sol) implemented caching of the installed Vercel CLI in the shared deployment action so exact cache hits skip installation.
