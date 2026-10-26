@@ -12,49 +12,14 @@ concurrency:
   cancel-in-progress: false
   queue: max
 jobs:
-  plan:
-    runs-on: ubuntu-latest
-    outputs:
-      branch: ${{ steps.plan.outputs.branch }}
-      target: ${{ steps.plan.outputs.target }}
-      build_backend: ${{ steps.plan.outputs.build_backend }}
-      build_frontend: ${{ steps.plan.outputs.build_frontend }}
-    steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Test deployment policy
-        # language=bash
-        run: python3 -m unittest discover -s ci -v
-      - name: Plan native path-filter equivalents
-        id: plan
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        # language=bash
-        run: python3 ci/deploy.py changes
   database:
-    needs: plan
     uses: ./.github/workflows/reusable-database.yml
-    with:
-      branch: ${{ needs.plan.outputs.branch }}
-      target: ${{ needs.plan.outputs.target }}
     secrets: inherit
   backend:
-    needs: [plan, database]
+    needs: database
     uses: ./.github/workflows/reusable-backend.yml
-    with:
-      branch: ${{ needs.plan.outputs.branch }}
-      target: ${{ needs.plan.outputs.target }}
-      build: ${{ needs.plan.outputs.build_backend == 'true' }}
-      database_branch_id: ${{ needs.database.outputs.branch_id }}
     secrets: inherit
   frontend:
-    needs: [plan, backend]
+    needs: backend
     uses: ./.github/workflows/reusable-frontend.yml
-    with:
-      branch: ${{ needs.plan.outputs.branch }}
-      target: ${{ needs.plan.outputs.target }}
-      build: ${{ needs.plan.outputs.build_frontend == 'true' }}
-      backend_url: ${{ needs.backend.outputs.url }}
     secrets: inherit

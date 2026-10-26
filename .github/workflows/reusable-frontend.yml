@@ -4,22 +4,15 @@ on:
     inputs:
       branch:
         type: string
-        required: true
+        default: ""
       target:
         type: string
-        default: preview
+        default: ""
       build:
         type: boolean
-        default: true
-      backend_url:
-        type: string
-        default: ""
+        default: false
     secrets:
       VERCEL_TOKEN:
-        required: false
-      NEON_API_KEY:
-        required: false
-      NEON_PROJECT_ID:
         required: false
     outputs:
       url:
@@ -29,70 +22,75 @@ permissions:
   actions: read
   pull-requests: write
 jobs:
-  backend:
-    if: inputs.backend_url == ''
-    uses: ./.github/workflows/reusable-backend.yml
-    with:
-      branch: ${{ inputs.branch }}
-      target: ${{ inputs.target }}
-      build: false
-    secrets: inherit
   frontend:
-    needs: backend
-    if: ${{ !cancelled() && !failure() }}
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     concurrency:
-      group: frontend-${{ inputs.target == 'production' && 'production' || inputs.branch }}
+      group: frontend-${{ (inputs.target || (github.event_name == 'push' && 'production' || 'preview')) == 'production' && 'production' || (inputs.branch || github.head_ref || github.ref_name) }}
       cancel-in-progress: false
       queue: max
     environment:
-      name: frontend-${{ inputs.target == 'production' && 'production' || inputs.branch }}
+      name: frontend-${{ (inputs.target || (github.event_name == 'push' && 'production' || 'preview')) == 'production' && 'production' || (inputs.branch || github.head_ref || github.ref_name) }}
       url: ${{ steps.deploy.outputs.url }}
     outputs:
       url: ${{ steps.deploy.outputs.url }}
     env:
       COMPONENT: frontend
-      DEPLOY_BRANCH: ${{ inputs.branch }}
-      DEPLOY_TARGET: ${{ inputs.target }}
-      BUILD_REQUESTED: ${{ inputs.build }}
-      BACKEND_URL: ${{ inputs.backend_url || needs.backend.outputs.url }}
+      DEPLOY_BRANCH: ${{ inputs.branch || github.head_ref || github.ref_name }}
+      DEPLOY_TARGET: ${{ inputs.target || (github.event_name == 'push' && 'production' || 'preview') }}
       VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
       VERCEL_FRONTEND_PROJECT_ID: ${{ vars.VERCEL_FRONTEND_PROJECT_ID }}
+      VERCEL_BACKEND_PROJECT_ID: ${{ vars.VERCEL_BACKEND_PROJECT_ID }}
       VERCEL_PROJECT_ID: ${{ vars.VERCEL_FRONTEND_PROJECT_ID }}
       VERCEL_LOCAL_CONFIG: frontend/vercel.json
     steps:
       - uses: actions/checkout@v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
+      - name: Check frontend changes
+        id: changes
+        if: github.event_name == 'push' || github.event.action == 'synchronize'
+        uses: $/.github/actions/component-changes
+        with:
+          path: frontend/
+      - name: Select build path
+        id: selection
+        env:
+          BUILD: ${{ inputs.build || steps.changes.outputs.changed == 'true' || github.event.action == 'opened' || github.event.action == 'reopened' }}
+        # language=bash
+        run: |
+          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
+          echo "BUILD_REQUESTED=$BUILD" >> "$GITHUB_ENV"
       - uses: pnpm/setup@v3.1.1
-        if: inputs.build
+        if: steps.selection.outputs.build == 'true'
         with:
           working-directory: frontend
           cache: true
       - name: Lint
         id: lint
-        if: inputs.build
+        if: steps.selection.outputs.build == 'true'
         continue-on-error: true
         working-directory: frontend
         # language=bash
         run: pnpm exec eslint . --format gha
       - name: Format
         id: format
-        if: inputs.build
+        if: steps.selection.outputs.build == 'true'
         continue-on-error: true
         uses: oxc-project/oxfmt-action@v0.0.1
         with:
           working-directory: frontend
       - name: Tests with GitHub annotations
         id: tests
-        if: inputs.build
+        if: steps.selection.outputs.build == 'true'
         continue-on-error: true
         working-directory: frontend
         # language=bash
         run: pnpm exec ng test --watch=false --reporters=default --reporters=github-actions
       - name: Production build
         id: build
-        if: inputs.build
+        if: steps.selection.outputs.build == 'true'
         continue-on-error: true
         working-directory: frontend
         # language=bash
@@ -107,6 +105,6 @@ jobs:
         id: deploy
         uses: $/.github/actions/vercel-prebuilt-deploy
         env:
-          RNS_FRONTEND_BUILD_READY: ${{ inputs.build }}
+          RNS_FRONTEND_BUILD_READY: ${{ steps.selection.outputs.build }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           GITHUB_TOKEN: ${{ github.token }}

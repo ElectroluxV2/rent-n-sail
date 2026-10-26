@@ -4,10 +4,13 @@ on:
     inputs:
       branch:
         type: string
-        required: true
+        default: ""
       target:
         type: string
-        default: preview
+        default: ""
+      build:
+        type: boolean
+        default: false
     secrets:
       NEON_API_KEY:
         required: false
@@ -22,18 +25,19 @@ permissions:
   pull-requests: write
 jobs:
   database:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     concurrency:
-      group: database-${{ inputs.target == 'production' && 'production' || inputs.branch }}
+      group: database-${{ (inputs.target || (github.event_name == 'push' && 'production' || 'preview')) == 'production' && 'production' || (inputs.branch || github.head_ref || github.ref_name) }}
       cancel-in-progress: false
       queue: max
     environment:
-      name: database-${{ inputs.target == 'production' && 'production' || inputs.branch }}
+      name: database-${{ (inputs.target || (github.event_name == 'push' && 'production' || 'preview')) == 'production' && 'production' || (inputs.branch || github.head_ref || github.ref_name) }}
     outputs:
       branch_id: ${{ steps.reference.outputs.branch_id }}
     env:
-      DEPLOY_BRANCH: ${{ inputs.branch }}
-      DEPLOY_TARGET: ${{ inputs.target }}
+      DEPLOY_BRANCH: ${{ inputs.branch || github.head_ref || github.ref_name }}
+      DEPLOY_TARGET: ${{ inputs.target || (github.event_name == 'push' && 'production' || 'preview') }}
       NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID || secrets.NEON_PROJECT_ID }}
       NEON_PARENT_BRANCH_ID: ${{ vars.NEON_PARENT_BRANCH_ID }}
       NEON_DATABASE_NAME: ${{ vars.NEON_DATABASE_NAME || 'neondb' }}
@@ -42,52 +46,72 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
+      - name: Check database changes
+        id: changes
+        if: github.event_name == 'push' || github.event.action == 'synchronize'
+        uses: $/.github/actions/component-changes
+        with:
+          path: database/
+      - name: Test Bash CI/CD
+        # language=bash
+        run: bash ci/test.sh
+      - name: Select migration path
+        id: selection
+        env:
+          BUILD: ${{ inputs.build || steps.changes.outputs.changed == 'true' || github.event.action == 'opened' || github.event.action == 'reopened' }}
+        # language=bash
+        run: echo "build=$BUILD" >> "$GITHUB_OUTPUT"
       - name: Resolve production parent
         id: plan
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
         # language=bash
-        run: python3 ci/deploy.py database-plan
+        run: bash ci/deploy.sh database-plan
       - name: Ensure copy-on-write preview branch
         id: branch
-        if: inputs.target == 'preview'
+        if: env.DEPLOY_TARGET == 'preview'
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          NEON_RESOLVED_PARENT: ${{ steps.plan.outputs.parent_branch_id }}
         # language=bash
-        run: python3 ci/deploy.py database-branch
+        run: bash ci/deploy.sh database-branch
       - name: Select database reference
         id: reference
         env:
-          NEON_BRANCH_ID: ${{ inputs.target == 'preview' && steps.branch.outputs.branch_id || steps.plan.outputs.parent_branch_id }}
+          NEON_BRANCH_ID: ${{ env.DEPLOY_TARGET == 'preview' && steps.branch.outputs.branch_id || steps.plan.outputs.parent_branch_id }}
         # language=bash
         run: echo "branch_id=$NEON_BRANCH_ID" >> "$GITHUB_OUTPUT"
       - uses: astral-sh/setup-uv@v10.3.2
+        if: steps.selection.outputs.build == 'true'
         with:
           working-directory: database
           enable-cache: true
           cache-python: true
           activate-environment: true
       - name: Install migration tools
+        if: steps.selection.outputs.build == 'true'
         # language=bash
         run: uv sync --directory database --locked
       - name: Test migrations
+        if: steps.selection.outputs.build == 'true'
         env:
           PYTEST_RUN_PATH: database
         # language=bash
         run: uv run --directory database --locked pytest -q
       - name: Resolve direct migration credentials privately
+        if: steps.selection.outputs.build == 'true'
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
           NEON_BRANCH_ID: ${{ steps.reference.outputs.branch_id }}
         # language=bash
-        run: python3 ci/deploy.py database-env
+        run: bash ci/deploy.sh database-env
       - name: Migrate selected database
+        if: steps.selection.outputs.build == 'true'
         # language=bash
         run: uv run --directory database --locked alembic upgrade head
       - name: Comment schema changes on the PR
-        if: github.event_name == 'pull_request' && inputs.target == 'preview'
+        if: github.event_name == 'pull_request' && env.DEPLOY_TARGET == 'preview'
         uses: neondatabase/schema-diff-action@v1.0.1
         with:
           api_key: ${{ secrets.NEON_API_KEY }}
@@ -103,5 +127,5 @@ jobs:
           {
             echo "## Database deployment"
             echo "Neon branch: $NEON_BRANCH_ID"
-            echo "Migrations: Alembic upgrade head completed."
+            echo "Migration path selected: ${{ steps.selection.outputs.build }}"
           } >> "$GITHUB_STEP_SUMMARY"

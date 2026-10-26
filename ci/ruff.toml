@@ -1,2 +1,0 @@
-extend = "../backend/ruff.toml"
-target-version = "py312"

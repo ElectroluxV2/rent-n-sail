@@ -4,16 +4,13 @@ on:
     inputs:
       branch:
         type: string
-        required: true
+        default: ""
       target:
         type: string
-        default: preview
+        default: ""
       build:
         type: boolean
-        default: true
-      database_branch_id:
-        type: string
-        default: ""
+        default: false
     secrets:
       VERCEL_TOKEN:
         required: false
@@ -29,32 +26,22 @@ permissions:
   actions: read
   pull-requests: write
 jobs:
-  database:
-    if: inputs.database_branch_id == ''
-    uses: ./.github/workflows/reusable-database.yml
-    with:
-      branch: ${{ inputs.branch }}
-      target: ${{ inputs.target }}
-    secrets: inherit
   backend:
-    needs: database
-    if: ${{ !cancelled() && !failure() }}
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     concurrency:
-      group: backend-${{ inputs.target == 'production' && 'production' || inputs.branch }}
+      group: backend-${{ (inputs.target || (github.event_name == 'push' && 'production' || 'preview')) == 'production' && 'production' || (inputs.branch || github.head_ref || github.ref_name) }}
       cancel-in-progress: false
       queue: max
     environment:
-      name: backend-${{ inputs.target == 'production' && 'production' || inputs.branch }}
+      name: backend-${{ (inputs.target || (github.event_name == 'push' && 'production' || 'preview')) == 'production' && 'production' || (inputs.branch || github.head_ref || github.ref_name) }}
       url: ${{ steps.deploy.outputs.url }}
     outputs:
       url: ${{ steps.deploy.outputs.url }}
     env:
       COMPONENT: backend
-      DEPLOY_BRANCH: ${{ inputs.branch }}
-      DEPLOY_TARGET: ${{ inputs.target }}
-      BUILD_REQUESTED: ${{ inputs.build }}
-      NEON_BRANCH_ID: ${{ inputs.database_branch_id || needs.database.outputs.branch_id }}
+      DEPLOY_BRANCH: ${{ inputs.branch || github.head_ref || github.ref_name }}
+      DEPLOY_TARGET: ${{ inputs.target || (github.event_name == 'push' && 'production' || 'preview') }}
       NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID || secrets.NEON_PROJECT_ID }}
       NEON_DATABASE_NAME: ${{ vars.NEON_DATABASE_NAME || 'neondb' }}
       NEON_ROLE_NAME: ${{ vars.NEON_ROLE_NAME || 'neondb_owner' }}
@@ -67,33 +54,48 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
+      - name: Check backend changes
+        id: changes
+        if: github.event_name == 'push' || github.event.action == 'synchronize'
+        uses: $/.github/actions/component-changes
+        with:
+          path: backend/
+      - name: Select build path
+        id: selection
+        env:
+          BUILD: ${{ inputs.build || steps.changes.outputs.changed == 'true' || github.event.action == 'opened' || github.event.action == 'reopened' }}
+        # language=bash
+        run: |
+          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
+          echo "BUILD_REQUESTED=$BUILD" >> "$GITHUB_ENV"
       - uses: astral-sh/setup-uv@v10.3.2
-        if: inputs.build
+        if: steps.selection.outputs.build == 'true'
         with:
           working-directory: backend
           enable-cache: true
           cache-python: true
           activate-environment: true
       - name: Install backend dependencies
-        if: inputs.build
+        if: steps.selection.outputs.build == 'true'
         # language=bash
         run: uv sync --directory backend --locked
       - name: Lint
         id: lint
-        if: inputs.build
+        if: steps.selection.outputs.build == 'true'
         continue-on-error: true
         # language=bash
         run: uv run --directory backend --locked ruff check --output-format=github
       - name: Format
         id: format
-        if: inputs.build
+        if: steps.selection.outputs.build == 'true'
         continue-on-error: true
         # language=bash
         run: uv run --directory backend --locked ruff format --check --output-format=github
       - name: Tests with GitHub annotations
         id: tests
-        if: inputs.build
+        if: steps.selection.outputs.build == 'true'
         continue-on-error: true
         env:
           PYTEST_RUN_PATH: backend

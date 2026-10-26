@@ -1,0 +1,20 @@
+name: Check changed path
+description: Check whether the event's before/after diff contains a path substring.
+inputs:
+  path:
+    description: Path substring to check, for example backend/.
+    required: true
+outputs:
+  changed:
+    description: Whether a changed path contains the supplied substring.
+    value: ${{ steps.detect.outputs.changed }}
+runs:
+  using: composite
+  steps:
+    - name: Check changed path
+      id: detect
+      shell: bash
+      env:
+        CHECK_PATH: ${{ inputs.path }}
+      # language=bash
+      run: bash "$GITHUB_ACTION_PATH/detect.sh" "$CHECK_PATH"

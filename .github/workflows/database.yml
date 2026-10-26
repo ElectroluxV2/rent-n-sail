@@ -17,6 +17,7 @@ jobs:
   database:
     uses: ./.github/workflows/reusable-database.yml
     with:
+      build: true
       branch: ${{ github.ref_name }}
       target: ${{ inputs.target }}
     secrets: inherit

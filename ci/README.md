@@ -2,11 +2,15 @@
 
 ## Entry points
 
-`automatic.yml` always resolves the stack on PRs and pushes to `main`. Its native GitHub file-list/git-diff planner selects application builds without a third-party changed-files action. Database-only or documentation-only changes do not compile applications.
+`automatic.yml` contains exactly three ordered calls: database → backend → frontend. All CI/CD orchestration uses Bash, jq, Git, curl, and the provider CLIs; there is no Python controller.
+
+Each reusable workflow calls `.github/actions/component-changes` once, with only `path: database/`, `backend/`, or `frontend/`. The action reads `before`/`after` from `$GITHUB_EVENT_PATH`, runs a NUL-delimited Git diff, and uses jq's `contains` to output `changed=true/false`. It includes additions, deletions, both sides of renames, and every commit in the push. It does not handle event types, resolve branches, accept build overrides, check deployment fingerprints, or implement fallbacks. Missing SHAs/history fail instead of silently meaning "unchanged". Checkouts use `fetch-depth: 0`.
+
+Callers invoke detection for pushes and PR `synchronize` events. Initial PR `opened`/`reopened` events explicitly run full validation/builds; manual runs use their existing build checkbox. These choices are outside the detector. Subsequent decisions use only the latest push, not the cumulative PR diff. Shared CI-only or documentation changes do not implicitly rebuild applications.
 
 The selected frontend production build is compiled once during validation. Vercel packaging reuses that validated output in the same job; standalone `build:vercel` still runs Angular's build first.
 
-The order is database → backend → frontend. `database.yml`, `backend.yml`, and `frontend.yml` are manual-only entry points; each calls its corresponding `reusable-*.yml` workflow. Manual application runs default to a build. A standalone backend resolves its database first; a standalone frontend resolves its backend and database first.
+`database.yml`, `backend.yml`, and `frontend.yml` are manual-only entry points; each calls only its corresponding reusable workflow. Manual application runs default to a build. Backend credentials are read privately from the matching Neon branch; the frontend reads its matching READY backend deployment through Vercel. Missing dependencies fail with an instruction to run the relevant workflow; no reusable workflow invokes another application's CI/CD. The frontend receives no Neon secrets.
 
 Every target is serialized across automatic/manual runs with a non-cancelling queue. Each application/database also has a shared per-target concurrency group and a GitHub Environment.
 
@@ -24,13 +28,13 @@ Variables:
 - `NEON_PARENT_BRANCH_ID` (optional; project default branch if unset). This must be the production parent intended for copy-on-write previews.
 - `NEON_DATABASE_NAME` / `NEON_ROLE_NAME` (optional; `neondb` / `neondb_owner`).
 
-The Neon REST resolver creates/reuses `preview/<git-branch>` and returns a non-secret branch ID, inheriting the project's supported compute settings. Connection strings are resolved privately in the consuming job: direct for Alembic, pooled for the backend. The official Neon Schema Diff action updates a PR comment after the migration.
+The Neon REST resolver checks for `preview/<git-branch>` first and creates a copy-on-write branch from production only when absent, inheriting supported compute defaults. Database changes select the migration/test path; unchanged databases keep their existing preview without rerunning migrations. Connection strings are resolved privately in the consuming job: direct for Alembic, pooled for the backend. The official Neon Schema Diff action updates the PR comment; credentials never cross job outputs.
 
 GitHub Actions now owns explicit preview branch preparation so database-first ordering is possible. The existing Vercel–Neon resource connection may remain, but avoid two competing preview-branching mechanisms. Workflow runtime bindings explicitly select the prepared branch. Branch cleanup is not automatic; delete obsolete previews deliberately in Neon after closing branches.
 
 ## Selective builds and portable output
 
-The resolver first reuses a READY deployment for the current branch if its runtime bindings match. Otherwise, it restores that branch's retained output, or production's retained output when bootstrapping a new branch. It never silently rebuilds unchanged source or falls back from a branch's code to older production code when only bindings changed.
+For an unchanged application, the resolver checks for an existing READY deployment for the current branch first. If present, it does not clone, rebuild, redeploy, change aliases, or rebind credentials—even when source/configuration has changed since an earlier unsuccessful run. This is the requested per-push policy; there is no source/config fingerprint override. Only when that preview is absent does it restore production's retained compiled output and bind it to the preview environment. Changed applications run their own full validation/build path.
 
 Vercel's [documented create-deployment API](https://vercel.com/docs/rest-api/deployments/create-a-new-deployment) describes `deploymentId` as a new build. Promotion changes production traffic, not preview runtime configuration. Until a supported zero-build clone endpoint is available, a small GitHub artifact containing compiled Build Output is the portable fallback; no OCI registry is used.
 
@@ -42,7 +46,7 @@ An existing production deployment created before this artifact contract has no r
 
 ## URLs and runtime configuration
 
-Each preview uses stable, project-and-branch-specific aliases. The frontend origin is reserved/ownership-checked before being granted CORS access; on first reservation the alias temporarily points at the existing stable frontend until the preview is published. Wait for the entire stack run to be green before using it. Existing aliases are never taken from another project.
+Each preview uses stable, project-and-branch-specific aliases. Before granting CORS access for a new backend publication, the frontend origin is reserved/ownership-checked; on first reservation the alias temporarily points at the existing production frontend until the preview is published. This is a provider hostname reservation, not a call to frontend CI or a frontend build/deployment. Reuse-only runs do not alter aliases. Wait for the entire stack run to be green before using it. Existing aliases are never taken from another project.
 
 The backend exposes `/`, `/health`, and `/boats` directly, without an `/api` prefix, and allows exactly the corresponding stable frontend origin. Open that stable URL from the GitHub Environment; an arbitrary deployment hostname is not implicitly trusted. The frontend receives the resolved backend URL as runtime configuration, not a compiled constant. SSR transfers its root URL to Angular; a client-rendered entry loads `/runtime-config.json` before bootstrap, fixing the missing-URL failure without a frontend rebuild when backend bindings change.
 
@@ -55,7 +59,8 @@ Fork PRs do not receive repository secrets under the normal `pull_request` trigg
 ## Verification
 
 ```bash
-python3 -m unittest discover -s ci -v
+bash ci/test.sh
+shellcheck ci/*.sh .github/actions/component-changes/detect.sh
 uv run --directory backend --locked pytest -q
 uv run --directory database --locked pytest -q
 ```
