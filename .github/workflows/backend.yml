@@ -41,9 +41,8 @@ jobs:
         run: uv sync --locked
         
       - name: Lint (Ruff)
-        id: ruff_lint
+        if: always()
         uses: astral-sh/ruff-action@v4.1.0
-        continue-on-error: true
         with:
           src: backend
           version-file: backend/uv.lock
@@ -51,20 +50,15 @@ jobs:
           args: check --output-format=github
 
       - name: Format (Ruff)
-        id: ruff_format
+        if: always()
         uses: astral-sh/ruff-action@v4.1.0
-        continue-on-error: true
         with:
           src: backend
           version-file: backend/uv.lock
           # language=bash
           args: format --check --output-format=github
 
-      - name: Fail if lint or formatting failed
-        if: >-
-          ${{
-              steps.ruff_lint.outcome == 'failure' ||
-              steps.ruff_format.outcome == 'failure'
-          }}  
+      - name: Run Unit Tests (Pytest)
+        if: always()
         # language=bash
-        run: exit 1
+        run: uv run --locked pytest -q

@@ -37,27 +37,21 @@ jobs:
           cache: true
 
       - name: Lint (Angular ESLint)
-        id: lint
+        if: always()
         # language=bash
         run: pnpm exec eslint . --format gha
-        continue-on-error: true
       
       - name: Check formatting
-        id: format
+        if: always()
         uses: oxc-project/oxfmt-action@v0.0.1
-        continue-on-error: true
         with:
           working-directory: frontend
+
+      - name: Run Unit Tests (Vitest)
+        if: always()
+        # language=bash
+        run: pnpm exec ng test --no-watch --no-progress --reporters=github-actions   
 
       - name: Angular
         # language=bash
         run: pnpm exec ng build
-
-      - name: Fail if lint or formatting failed
-        if: >-
-          ${{
-              steps.lint.outcome == 'failure' ||
-              steps.format.outcome == 'failure'
-          }}  
-        # language=bash
-        run: exit 1

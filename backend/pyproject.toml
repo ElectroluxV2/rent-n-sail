@@ -18,4 +18,6 @@ entrypoint = "main:app"
 dev = [
     "ruff>=0.17.2",
     "scalar-fastapi>=1.9.1",
+    "pytest>=9.1.1",    
+    "pytest-github-actions-annotate-failures>=0.4.2",
 ]
