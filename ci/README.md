@@ -24,7 +24,7 @@ Variables:
 - `NEON_PARENT_BRANCH_ID` (optional; project default branch if unset). This must be the production parent intended for copy-on-write previews.
 - `NEON_DATABASE_NAME` / `NEON_ROLE_NAME` (optional; `neondb` / `neondb_owner`).
 
-The official Neon Create Branch action creates/reuses `preview/<git-branch>` and returns a non-secret branch ID. Connection strings are resolved privately in the consuming job: direct for Alembic, pooled for the backend. The official Neon Schema Diff action updates a PR comment after the migration.
+The Neon REST resolver creates/reuses `preview/<git-branch>` and returns a non-secret branch ID, inheriting the project's supported compute settings. Connection strings are resolved privately in the consuming job: direct for Alembic, pooled for the backend. The official Neon Schema Diff action updates a PR comment after the migration.
 
 GitHub Actions now owns explicit preview branch preparation so database-first ordering is possible. The existing Vercel–Neon resource connection may remain, but avoid two competing preview-branching mechanisms. Workflow runtime bindings explicitly select the prepared branch. Branch cleanup is not automatic; delete obsolete previews deliberately in Neon after closing branches.
 

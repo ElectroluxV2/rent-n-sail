@@ -9,6 +9,7 @@
 - Fixed frontend client-rendered startup by loading public runtime configuration before Angular resolves its backend URL, while preserving SSR transfer state. Folded in pending fourth-round changes: no API discovery stub, explicit-only CORS, annotated pytest, and shell-independent Portless commands using native `PORT` support.
 - Progress, provider constraints, required secret names, and final status are reported on PR #14 only, as requested.
 - Local validation: 17 deployment/artifact policy tests, five backend tests (plus CORS subtests), four Angular tests, the Alembic migration lifecycle test, Node.js 24 packaging/SSR checks, and native Portless startup checks passed. Regenerated both Python lockfiles with the documented uv 0.13.5 version and verified all seven action-lock entries/workflows. The user added Neon credentials; the project ID is accepted as either a repository variable or secret.
+- First live run reached Neon successfully but the branch action returned HTTP 412. Added sanitized provider diagnostics and an idempotent REST branch resolver that inherits project compute settings rather than sending action-specific overrides; no existing branches are deleted.
 
 ## 2026-10-26 — PR #14 fourth-round work and workflow redesign proposal
 

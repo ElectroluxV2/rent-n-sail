@@ -6,9 +6,11 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from urllib.error import HTTPError
 
 from ci.deploy import (
     DeploymentError,
+    JsonApi,
     Neon,
     Vercel,
     alias_name,
@@ -200,6 +202,58 @@ class ArtifactTests(unittest.TestCase):
 
 
 class NeonTests(unittest.TestCase):
+    def test_branch_resolution_is_idempotent_and_inherits_compute_defaults(self):
+        class Api:
+            def __init__(self):
+                self.branches = []
+                self.created = []
+
+            def request(self, method, path, **kwargs):
+                if method == "GET":
+                    return {"branches": self.branches}
+                self.created.append(kwargs["data"])
+                branch = {"id": "preview-id", "name": kwargs["data"]["branch"]["name"]}
+                self.branches.append(branch)
+                return {"branch": branch}
+
+        api = Api()
+        provider = Neon(api, "project")
+        self.assertEqual(
+            provider.ensure_branch("preview/feature", "parent"), "preview-id"
+        )
+        self.assertEqual(
+            provider.ensure_branch("preview/feature", "parent"), "preview-id"
+        )
+        self.assertEqual(
+            api.created,
+            [
+                {
+                    "branch": {"name": "preview/feature", "parent_id": "parent"},
+                    "endpoints": [{"type": "read_write"}],
+                }
+            ],
+        )
+
+    def test_provider_preconditions_are_useful_but_do_not_disclose_credentials(self):
+        payload = json.dumps(
+            {
+                "message": "Compute setting is not allowed token-fixture postgresql://owner:password@db/test"
+            }
+        ).encode()
+        error = HTTPError(
+            "https://provider.test", 412, "precondition", {}, io.BytesIO(payload)
+        )
+        with (
+            patch("ci.deploy.urlopen", side_effect=error),
+            self.assertRaises(DeploymentError) as caught,
+        ):
+            JsonApi("https://provider.test", "token-fixture").request(
+                "POST", "/branches", data={}
+            )
+        self.assertIn("Compute setting is not allowed", str(caught.exception))
+        self.assertNotIn("token-fixture", str(caught.exception))
+        self.assertNotIn("password", str(caught.exception))
+
     def test_connection_lookup_is_explicit_and_pooling_is_selected_per_use(self):
         class Api:
             def request(self, method, path, **kwargs):

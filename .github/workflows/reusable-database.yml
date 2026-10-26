@@ -52,15 +52,11 @@ jobs:
       - name: Ensure copy-on-write preview branch
         id: branch
         if: inputs.target == 'preview'
-        uses: neondatabase/create-branch-action@6.3.1
-        with:
-          api_key: ${{ secrets.NEON_API_KEY }}
-          project_id: ${{ env.NEON_PROJECT_ID }}
-          parent_branch: ${{ steps.plan.outputs.parent_branch_id }}
-          branch_name: ${{ steps.plan.outputs.branch_name }}
-          database: ${{ env.NEON_DATABASE_NAME }}
-          role: ${{ env.NEON_ROLE_NAME }}
-          suspend_timeout: 300
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_RESOLVED_PARENT: ${{ steps.plan.outputs.parent_branch_id }}
+        # language=bash
+        run: python3 ci/deploy.py database-branch
       - name: Select database reference
         id: reference
         env:

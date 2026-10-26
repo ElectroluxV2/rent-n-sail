@@ -8,6 +8,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import tarfile
@@ -72,14 +73,35 @@ class JsonApi:
                     return None
                 if (
                     method == "GET"
-                    and error.code in (429, 502, 503, 504)
+                    and error.code in (423, 429, 502, 503, 504)
                     and attempt < 2
                 ):
                     time.sleep(2**attempt)
                     continue
-                # Provider response bodies can contain connection strings.
+                # Report useful precondition errors, never raw response bodies.
+                try:
+                    body = json.loads(error.read())
+                    detail = body.get("message") or body.get("error", {}).get(
+                        "message", ""
+                    )
+                    if not isinstance(detail, str):
+                        detail = ""
+                except ValueError, AttributeError:
+                    detail = ""
+                for secret in (
+                    self.token,
+                    *(
+                        os.environ.get(key, "")
+                        for key in ("VERCEL_TOKEN", "NEON_API_KEY", "GITHUB_TOKEN")
+                    ),
+                ):
+                    if secret:
+                        detail = detail.replace(secret, "<REDACTED>")
+                detail = re.sub(
+                    r"(?:postgres(?:ql)?|https?)://\S+", "<REDACTED URL>", detail
+                )[:500]
                 raise DeploymentError(
-                    f"{self.base} {method} {path}: HTTP {error.code}"
+                    f"{self.base} {method} {path}: HTTP {error.code}. {detail}"
                 ) from None
 
 
@@ -116,6 +138,26 @@ class Neon:
         )
         mask(result["uri"])
         return result["uri"]
+
+    def ensure_branch(self, name, parent):
+        path = f"/projects/{quote(self.project)}/branches"
+        branches = self.api.request("GET", path)["branches"]
+        matches = [branch for branch in branches if branch["name"] == name]
+        if len(matches) > 1:
+            raise DeploymentError("The preview branch name is ambiguous.")
+        if matches:
+            return matches[0]["id"]
+        # Inherit supported project defaults rather than overriding compute or
+        # autosuspend settings on managed/free plans.
+        result = self.api.request(
+            "POST",
+            path,
+            data={
+                "branch": {"name": name, "parent_id": parent},
+                "endpoints": [{"type": "read_write"}],
+            },
+        )
+        return result["branch"]["id"]
 
 
 def neon():
@@ -525,6 +567,7 @@ def main():
             "changes",
             "database-plan",
             "database-env",
+            "database-branch",
             "plan",
             "pack",
             "restore",
@@ -587,6 +630,12 @@ def main():
         if os.environ.get("GITHUB_ENV"):
             with open(os.environ["GITHUB_ENV"], "a") as stream:
                 stream.write(f"DATABASE_URL={value}\n")
+        return
+    if command == "database-branch":
+        branch = neon().ensure_branch(
+            "preview/" + required("DEPLOY_BRANCH"), required("NEON_RESOLVED_PARENT")
+        )
+        output("branch_id", branch)
         return
     state_path = required("STATE_FILE")
     if command == "plan":
