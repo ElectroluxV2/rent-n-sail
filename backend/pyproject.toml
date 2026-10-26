@@ -9,7 +9,6 @@ dependencies = [
     "pydantic>=2.14.1",
     "uvicorn>=0.54.0",
     "pytest>=9.1.1",
-    "pytest-github-actions-annotate-failures>=0.4.2",
 ]
 
 [tool.fastapi]
@@ -20,4 +19,5 @@ entrypoint = "main:app"
 dev = [
     "ruff>=0.17.2",
     "scalar-fastapi>=1.9.1",
+    "pytest-github-actions-annotate-failures>=0.4.2",
 ]
