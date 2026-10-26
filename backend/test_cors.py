@@ -13,6 +13,7 @@ class CorsTests(unittest.TestCase):
     def test_frontend_origins_can_read_backend_directly(self):
         for origin in (
             "http://localhost:4200",
+            "https://frontend.localhost",
             "https://rent-n-sail-frontend.vercel.app",
             "https://rent-n-sail-frontend-3slpyq5h9-rent-n-sail.vercel.app",
             "https://rent-n-sail-frontend-git-cd-rent-n-sail.vercel.app",

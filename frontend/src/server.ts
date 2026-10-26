@@ -10,12 +10,15 @@ import { join } from 'node:path';
 const browserDistFolder = join(import.meta.dirname, '../browser');
 
 const app = express();
+const portlessUrl = process.env['PORTLESS_URL'];
 // Vercel provides these deployment domains at runtime, without a URL scheme:
 // https://vercel.com/docs/environment-variables/system-environment-variables
 const allowedHosts = [
   process.env['VERCEL_URL'],
   process.env['VERCEL_BRANCH_URL'],
   process.env['VERCEL_PROJECT_PRODUCTION_URL'],
+  // Portless supplies the local URL; Angular expects only its hostname.
+  portlessUrl ? new URL(portlessUrl).hostname : undefined,
   'localhost',
 ].filter((host): host is string => Boolean(host));
 const angularApp = new AngularNodeAppEngine({ allowedHosts });

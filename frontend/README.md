@@ -8,19 +8,24 @@ The frontend and backend use separate Vercel projects. Postgres is hosted by Neo
 
 - `api/index.js` exposes the compiled Angular SSR handler as a [Vercel Node.js Function](https://vercel.com/docs/functions/runtimes/node-js). The browser build alone does not provide that function. The page rewrites in `vercel.json` route requests to this handler, while static assets are served directly.
 - SSR reads the public backend origin from `BACKEND_URL` and transfers its `/api` URL to the browser using Angular `TransferState`. Both SSR and the browser call that backend URL directly; there is no frontend-to-backend proxy hop or transfer-cache origin remapping. Set `BACKEND_URL` on the frontend Vercel project to the desired production or preview backend origin. It is public browser configuration and must not contain credentials.
-- The backend allows CORS from `http://localhost:4200`, the production frontend, and this frontend project's deployments under the `rent-n-sail` Vercel team. Set comma-separated `CORS_ALLOWED_ORIGINS` and/or `CORS_ALLOWED_ORIGIN_REGEX` on the backend to override these defaults for custom domains or local hostnames. The current API permits cross-origin `GET` requests without cookies.
+- The backend allows CORS from `https://frontend.localhost`, legacy `http://localhost:4200`, the production frontend, and this frontend project's deployments under the `rent-n-sail` Vercel team. Set comma-separated `CORS_ALLOWED_ORIGINS` and/or `CORS_ALLOWED_ORIGIN_REGEX` on the backend to override these defaults for custom domains or local hostnames. The current API permits cross-origin `GET` requests without cookies.
 
-Portless can provide local service hostnames; configure those origins in the backend CORS allowlist. The remaining page rewrites only route frontend requests to Angular SSR.
+The remaining page rewrites only route frontend requests to Angular SSR.
 
 ## Development server
 
-To start a local development server, run:
+After installing frontend dependencies, run these commands in separate terminals from `frontend`:
 
 ```bash
-BACKEND_URL=http://localhost:8000 pnpm start
+pnpm run start:backend
+pnpm start
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+[Portless](https://github.com/vercel-labs/portless) exposes the backend at `https://backend.localhost` and the frontend at `https://frontend.localhost`. It assigns free application ports automatically; the backend command explicitly consumes its `PORT` variable. The frontend uses the backend hostname by default, and `BACKEND_URL` can override it.
+
+On first use, Portless may request permission to trust its local CA and bind HTTPS port 443. Run it interactively and follow its prompts. For custom proxy ports, TLS modes, hostnames, or worktrees, set `BACKEND_URL` to the backend's actual Portless URL and update `CORS_ALLOWED_ORIGINS` to the frontend's actual origin. No local CA or system trust changes are performed by repository setup or CI.
+
+Open `https://frontend.localhost/`. The application will automatically reload when source files change.
 
 ## Code scaffolding
 

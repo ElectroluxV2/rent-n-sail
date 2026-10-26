@@ -10,7 +10,8 @@ app.add_middleware(
         origin.strip()
         for origin in os.environ.get(
             "CORS_ALLOWED_ORIGINS",
-            "http://localhost:4200,https://rent-n-sail-frontend.vercel.app",
+            "http://localhost:4200,https://frontend.localhost,"
+            "https://rent-n-sail-frontend.vercel.app",
         ).split(",")
         if origin.strip()
     ],
