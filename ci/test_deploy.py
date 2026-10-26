@@ -1,3 +1,4 @@
+import ast
 import io
 import json
 import os
@@ -28,6 +29,10 @@ from ci.deploy import (
 
 
 class DeploymentPolicyTests(unittest.TestCase):
+    def test_controller_syntax_is_compatible_with_runner_python_before_uv_setup(self):
+        for path in Path(__file__).parent.glob("*.py"):
+            ast.parse(path.read_text(), filename=str(path), feature_version=(3, 12))
+
     def test_documentation_and_database_changes_do_not_build_applications(self):
         for files in (
             ["README.md"],

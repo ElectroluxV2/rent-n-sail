@@ -10,6 +10,7 @@
 - Progress, provider constraints, required secret names, and final status are reported on PR #14 only, as requested.
 - Local validation: 17 deployment/artifact policy tests, five backend tests (plus CORS subtests), four Angular tests, the Alembic migration lifecycle test, Node.js 24 packaging/SSR checks, and native Portless startup checks passed. Regenerated both Python lockfiles with the documented uv 0.13.5 version and verified all seven action-lock entries/workflows. The user added Neon credentials; the project ID is accepted as either a repository variable or secret.
 - First live run reached Neon successfully but the branch action returned HTTP 412. Added sanitized provider diagnostics and an idempotent REST branch resolver that inherits project compute settings rather than sending action-specific overrides; no existing branches are deleted.
+- Pinned the deployment controller's Ruff target to runner Python 3.12 after a Python-3.14 formatting transformation broke bootstrap parsing. Added a regression test that parses every controller source file with the Python 3.12 grammar before app-specific uv setup.
 
 ## 2026-10-26 — PR #14 fourth-round work and workflow redesign proposal
 

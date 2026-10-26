@@ -86,7 +86,7 @@ class JsonApi:
                     )
                     if not isinstance(detail, str):
                         detail = ""
-                except ValueError, AttributeError:
+                except (ValueError, AttributeError):
                     detail = ""
                 for secret in (
                     self.token,
