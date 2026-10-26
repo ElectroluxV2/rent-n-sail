@@ -1,5 +1,21 @@
 # AI usage docs
 
+## 2026-10-26 — Installed Vercel CLI caching
+
+- AI assistance: OpenCode (GPT-6.1 Sol) implemented caching of the installed Vercel CLI in the shared deployment action so exact cache hits skip installation.
+- Author attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- The cache key includes the runner OS and architecture, Node.js version, pnpm version, and Vercel CLI version. Cold runs install into a dedicated tool-cache directory with project-local package links and allow the required `esbuild` build script. The cache is saved immediately after installation so subsequent deployment failures do not prevent reuse.
+- Disabled the backend pnpm store cache that required a nonexistent pnpm lockfile. Regenerated `actions.lock` with `gh actions-lock`, including migration of shared-action references to the pinned `$/` syntax. Removed trailing whitespace from the backend lint/format failure condition that made it unconditional.
+- Verification: using pnpm 12.15.0, Node.js 24.22.1, and Vercel 65.2.0, executed the action's installation scripts, archived the CLI, deleted its installation and package store, and restored the archive. The restored CLI passed `--version` and `build --help` without reinstalling. ShellCheck and `gh actions-lock --verify` passed. Actionlint passed with a narrow exception for the supported `$/` syntax that actionlint 1.7.12 does not yet recognize.
+- Follow-up AI assistance: prepared the validated changes for commit and push to `cd` at the author's request, using the personal SSH remote.
+
+## 2026-10-26 — Backend CI cache failure diagnosis
+
+- AI assistance: OpenCode (GPT-6.1 Sol) cloned the repository using the personal SSH alias `ghp`, checked out `cd`, selected the personal GitHub CLI account, and investigated [Backend CI run 40340937710](https://github.com/Renters-Sailors/rent-n-sail/actions/runs/40340937710).
+- Author attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- Root cause: both backend `pnpm/setup@v3.1.1` steps enable caching, which requires a pnpm lockfile. The Python backend has `uv.lock` but no `pnpm-lock.yaml`, so cache restoration fails with `Some specified paths were not resolved, unable to cache dependencies.`
+- Verification: reproduced the exact failure using the pinned upstream action (`a0881977cd8ea73b1ed212236c99ca10dcc80cf4`) against a temporary snapshot of the failing commit. Changing only `cache` to `false` completed pnpm and Node.js setup successfully. Recommended setting `cache: false` in both backend pnpm setup steps.
+
 ## 2026-10-26 — pnpm setup in Vercel deployment jobs
 
 - AI assistance: Junie (OpenAI GPT-6 Luna) compared the frontend/backend GitHub Actions setup steps and explained why pnpm setup is currently outside the shared Vercel deployment composite action.

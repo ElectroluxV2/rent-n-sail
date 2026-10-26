@@ -40,13 +40,13 @@ jobs:
           filter: tree:0
           persist-credentials: false
 
-      - name: Set up pnpm with GitHub Actions cache
+      - name: Set up pnpm and Node.js
         uses: pnpm/setup@v3.1.1
         with:
           working-directory: backend
           version: 12.15.0
           runtime: node@24
-          cache: true
+          cache: false
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v10.3.2
@@ -87,7 +87,7 @@ jobs:
           ${{
               steps.ruff_lint.outcome == 'failure' ||
               steps.ruff_format.outcome == 'failure'
-          }}  
+          }}
         # language=bash
         run: exit 1
 
@@ -125,13 +125,13 @@ jobs:
           filter: tree:0
           persist-credentials: false
 
-      - name: Set up pnpm with GitHub Actions cache
+      - name: Set up pnpm and Node.js
         uses: pnpm/setup@v3.1.1
         with:
           working-directory: backend
           version: 12.15.0
           runtime: node@24
-          cache: true
+          cache: false
 
       - name: Build and deploy backend with Vercel
-        uses: ./.github/actions/vercel-prebuilt-deploy
+        uses: $/.github/actions/vercel-prebuilt-deploy

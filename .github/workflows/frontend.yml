@@ -125,4 +125,4 @@ jobs:
           cache: true
 
       - name: Build and deploy frontend with Vercel
-        uses: ./.github/actions/vercel-prebuilt-deploy
+        uses: $/.github/actions/vercel-prebuilt-deploy

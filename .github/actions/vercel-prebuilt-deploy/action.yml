@@ -3,9 +3,44 @@ description: Build and upload a Vercel deployment using configuration from the c
 runs:
   using: composite
   steps:
-    - name: Install Vercel CLI with pnpm
+    - name: Prepare Vercel CLI cache
+      id: vercel_cli
       shell: bash
-      run: pnpm add --global "vercel@$VERCEL_CLI_VERSION"
+      run: |
+        node_version=$(node --version)
+        pnpm_version=$(pnpm --version)
+        {
+          echo "node-version=$node_version"
+          echo "pnpm-version=$pnpm_version"
+        } >> "$GITHUB_OUTPUT"
+        echo "$RUNNER_TOOL_CACHE/vercel-cli/node_modules/.bin" >> "$GITHUB_PATH"
+
+    - name: Restore Vercel CLI cache
+      id: vercel_cli_cache
+      uses: actions/cache/restore@v6.1.0
+      with:
+        path: ${{ runner.tool_cache }}/vercel-cli
+        key: vercel-cli-v1-${{ runner.os }}-${{ runner.arch }}-node-${{ steps.vercel_cli.outputs.node-version }}-pnpm-${{ steps.vercel_cli.outputs.pnpm-version }}-vercel-${{ env.VERCEL_CLI_VERSION }}
+
+    - name: Install Vercel CLI with pnpm
+      if: steps.vercel_cli_cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        mkdir -p "$RUNNER_TOOL_CACHE/vercel-cli"
+        # Keep package links inside the cached installation.
+        pnpm --dir "$RUNNER_TOOL_CACHE/vercel-cli" add --save-exact \
+          --allow-build=esbuild \
+          --store-dir "$RUNNER_TEMP/vercel-cli-store" \
+          --config.virtual-store-type=project \
+          "vercel@$VERCEL_CLI_VERSION"
+        vercel --version
+
+    - name: Save Vercel CLI cache
+      if: steps.vercel_cli_cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6.1.0
+      with:
+        path: ${{ runner.tool_cache }}/vercel-cli
+        key: ${{ steps.vercel_cli_cache.outputs.cache-primary-key }}
 
     - name: Build and deploy prebuilt output
       shell: bash
