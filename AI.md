@@ -5,6 +5,7 @@
 - AI assistance: OpenCode (GPT-6.1 Sol) inspected the caller/reusable job names and proposed concise UI naming schemes. Author attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`). The repeated `backend / backend` label comes from the caller job and the job inside the reusable workflow, not the reusable workflow's top-level name. Recommended explicit job display names while retaining job IDs and dependency/output references. No workflow names were changed pending the user's choice.
 - Follow-up: after the user questioned the database-specific label, recommended the same inner display name, `Ensure deployment`, for database, backend, and frontend. Naming changes remain unapplied.
 - Implemented the approved display names for automatic and manual callers: `Database / Ensure deployment`, `Backend / Ensure deployment`, and `Frontend / Ensure deployment`. Only job `name` fields changed; job IDs, references, execution order, and behavior remain unchanged. Author identity was reverified with `gh api user`.
+- Shortened the inner display name to `Deployment` in all three reusable workflows at the user's request so the labels fit the GitHub UI. Job IDs and behavior remain unchanged. Attribution: `@ElectroluxV2` (Mateusz Budzisz, reverified with `gh api user`).
 
 ## 2026-10-26 — Minimal Bash composite detector and independent reusable workflows
 
