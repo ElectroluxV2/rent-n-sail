@@ -57,13 +57,6 @@ jobs:
           version-file: backend/uv.lock
           # language=bash
           args: format --check --output-format=github
-          
-      - name: List workspace contents
-        if: always()
-        # language=bash
-        run: |
-          pwd
-          ls -la
 
       - name: Run Unit Tests (Pytest)
         if: always()
