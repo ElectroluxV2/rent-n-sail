@@ -6,6 +6,7 @@ from authtuna.integrations import auth_service
 from fastapi import APIRouter, HTTPException, Request, Response
 
 from auth.login.requests import PasskeyLoginRequest
+from auth.passkey import PASSKEY_AUTH_CHALLENGE_SESSION_KEY, verify_authentication
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -17,23 +18,21 @@ async def login_with_passkey(
     request: Request,
     response: Response,
 ) -> dict[str, object]:
-    if payload.response is None:
+    if payload.assertion is None:
         logger.info("Starting passkey login")
         options, challenge = (
             auth_service.passkeys.core.generate_authentication_options()
         )
-        request.session["passkey_authentication_challenge"] = challenge
+        request.session[PASSKEY_AUTH_CHALLENGE_SESSION_KEY] = challenge
         return {"options": options}
 
-    challenge = request.session.pop("passkey_authentication_challenge", None)
+    challenge = request.session.pop(PASSKEY_AUTH_CHALLENGE_SESSION_KEY, None)
     if challenge is None:
         logger.warning("Passkey login rejected: challenge missing or expired")
         raise HTTPException(400, "Passkey login expired. Start again.")
 
     try:
-        credential_id = encryption_utils.base64url_decode(
-            str(payload.response["id"])
-        )
+        credential_id = encryption_utils.base64url_decode(str(payload.assertion["id"]))
     except (KeyError, ValueError) as error:
         logger.warning("Passkey login rejected: malformed credential identifier")
         raise HTTPException(400, "Invalid passkey response.") from error
@@ -44,8 +43,8 @@ async def login_with_passkey(
         raise HTTPException(404, "This passkey is not registered.")
 
     try:
-        sign_count = auth_service.passkeys.core.verify_authentication(
-            response=payload.response,
+        sign_count = verify_authentication(
+            response=payload.to_authentication_response(),
             session_challenge=challenge,
             credential=credential,
         )

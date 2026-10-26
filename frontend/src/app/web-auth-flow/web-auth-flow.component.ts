@@ -95,7 +95,7 @@ export class WebAuthFlowComponent {
 
       try {
         const result = await this.sendFlow('login/passkey', {
-          response: this.getAssertion(credential),
+          assertion: this.getAssertion(credential),
         });
         if (result.status !== 'logged_in') {
           throw new Error('The saved passkey could not sign you in.');
@@ -140,7 +140,7 @@ export class WebAuthFlowComponent {
         throw new Error('Passkey creation was cancelled.');
       }
       await this.sendFlow('register/passkey/complete', {
-        response: this.registrationResponse(credential),
+        attestation: this.registrationResponse(credential),
       });
       this.status.set('Account registered with a passkey.');
       this.canCreateAccount.set(false);

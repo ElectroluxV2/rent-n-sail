@@ -2,7 +2,7 @@ from typing import NotRequired, TypedDict
 
 from pydantic import BaseModel, Field
 
-from auth.passkey import PasskeyAttestation
+from auth.passkey import AuthenticatorAttestationResponse, PasskeyAttestation
 
 
 class PasskeyRegistrationInitRequest(BaseModel):
@@ -10,7 +10,10 @@ class PasskeyRegistrationInitRequest(BaseModel):
 
 
 class PasskeyRegistrationCompleteRequest(BaseModel):
-    response: PasskeyAttestation
+    attestation: PasskeyAttestation
+
+    def to_authentication_response(self) -> AuthenticatorAttestationResponse:
+        return AuthenticatorAttestationResponse(response=self.attestation)
 
 
 class RegistrationClientExtensionResults(TypedDict):

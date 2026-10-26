@@ -1,7 +1,10 @@
 from pydantic import BaseModel
 
-from auth.passkey import PasskeyAssertion
+from auth.passkey import AuthenticatorAssertionResponse, PasskeyAssertion
 
 
 class PasskeyLoginRequest(BaseModel):
-    response: PasskeyAssertion | None = None
+    assertion: PasskeyAssertion | None = None
+
+    def to_authentication_response(self) -> AuthenticatorAssertionResponse:
+        return AuthenticatorAssertionResponse(response=self.assertion)

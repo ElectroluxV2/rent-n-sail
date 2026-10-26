@@ -5,6 +5,11 @@ from authtuna.helpers import create_session_and_set_cookie
 from authtuna.integrations import auth_service
 from fastapi import APIRouter, HTTPException, Request, Response
 
+from auth.passkey import (
+    PASSKEY_FLOW_USER_ID_SESSION_KEY,
+    PASSKEY_REGISTER_CHALLENGE_SESSION_KEY,
+    verify_registration,
+)
 from auth.register.requests import (
     PasskeyRegistrationCompleteRequest,
     PasskeyRegistrationInitRequest,
@@ -23,7 +28,7 @@ async def register_init(
     if not username:
         raise HTTPException(422, "A username is required to register.")
 
-    user_id = request.session.get("passkey_flow_user_id")
+    user_id = request.session.get(PASSKEY_FLOW_USER_ID_SESSION_KEY)
     if user_id is None:
         logger.info("Creating account for passkey registration")
         email = f"{secrets.token_urlsafe(24)}@passkey.rent-n-sail.invalid"
@@ -35,11 +40,11 @@ async def register_init(
             ip_address=request.state.user_ip_address,
         )
         user_id = user.id
-        request.session["passkey_flow_user_id"] = user_id
+        request.session[PASSKEY_FLOW_USER_ID_SESSION_KEY] = user_id
 
     user = await auth_service.users.get_by_id(user_id)
     if user is None:
-        request.session.pop("passkey_flow_user_id", None)
+        request.session.pop(PASSKEY_FLOW_USER_ID_SESSION_KEY, None)
         logger.warning(
             "Passkey registration initialization failed: pending user missing"
         )
@@ -50,7 +55,7 @@ async def register_init(
         username=user.username,
         existing_credentials=await auth_service.passkeys.get_for_user(user.id),
     )
-    request.session["passkey_registration_challenge"] = challenge
+    request.session[PASSKEY_REGISTER_CHALLENGE_SESSION_KEY] = challenge
     logger.info("Passkey registration options generated")
     return {"options": options}
 
@@ -61,8 +66,8 @@ async def register_complete(
     request: Request,
     response: Response,
 ) -> dict[str, str]:
-    challenge = request.session.pop("passkey_registration_challenge", None)
-    user_id = request.session.get("passkey_flow_user_id")
+    challenge = request.session.pop(PASSKEY_REGISTER_CHALLENGE_SESSION_KEY, None)
+    user_id = request.session.get(PASSKEY_FLOW_USER_ID_SESSION_KEY)
     if challenge is None or user_id is None:
         logger.warning(
             "Passkey registration rejected: challenge or pending user missing"
@@ -70,9 +75,8 @@ async def register_complete(
         raise HTTPException(400, "Passkey registration expired. Start again.")
 
     try:
-        credential_data = auth_service.passkeys.core.verify_registration(
-            response=payload.response,
-            session_challenge=challenge,
+        credential_data = verify_registration(
+            response=payload.to_authentication_response(), session_challenge=challenge
         )
         await auth_service.passkeys.save_new_credential(
             user_id=user_id,
@@ -85,9 +89,10 @@ async def register_complete(
         await create_session_and_set_cookie(
             user, request, response, auth_service.db_manager.get_db()
         )
-        request.session.pop("passkey_flow_user_id", None)
+        request.session.pop(PASSKEY_FLOW_USER_ID_SESSION_KEY, None)
     except ValueError as error:
         logger.exception("Passkey registration verification failed", exc_info=error)
+        auth_service.users.delete(user_id)  # clean up failed registration process
         raise HTTPException(400, "Passkey registration failed.") from None
 
     logger.info("Passkey registration succeeded")

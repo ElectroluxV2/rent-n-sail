@@ -1,12 +1,13 @@
 import logging
 from pathlib import Path
 
+import uvicorn
 from authtuna import init_app, init_settings
 from fastapi import APIRouter, FastAPI
 from scalar_fastapi import add_scalar_reference
 
 init_settings(
-    API_BASE_URL="http://localhost:5000",
+    API_BASE_URL="http://localhost:8000",
     DEFAULT_DATABASE_URI=f"sqlite+aiosqlite:///{Path(__file__).with_name('authtuna_dev.db')}",
     WEBAUTHN_RP_ID="localhost",
     WEBAUTHN_RP_NAME="Rent n Sail",
@@ -39,3 +40,7 @@ add_scalar_reference(app)
 @main_router.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+if __name__ == "__main__":  # for debugging
+    uvicorn.run(app, host="0.0.0.0", port=8000)
