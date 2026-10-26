@@ -6,6 +6,7 @@ import tarfile
 import tempfile
 import unittest
 from pathlib import Path
+from subprocess import CompletedProcess
 from unittest.mock import patch
 from urllib.error import HTTPError
 
@@ -25,6 +26,7 @@ from ci.deploy import (
     resolve_mode,
     restore_output,
     select_deployment,
+    smoke,
 )
 
 
@@ -281,6 +283,49 @@ class NeonTests(unittest.TestCase):
 
 
 class ProviderBindingTests(unittest.TestCase):
+    def test_live_backend_verification_checks_database_rows_and_cors(self):
+        def request(command, **kwargs):
+            self.assertEqual(command[:2], ["vercel", "curl"])
+            headers = Path(command[command.index("--dump-header") + 1])
+            headers.write_text(
+                "HTTP/2 200\naccess-control-allow-origin: https://frontend.test\n"
+            )
+            return CompletedProcess(
+                command,
+                0,
+                '[{"id":1,"name":"Demo sailboat","daily_rate":"125.00"}]',
+                "",
+            )
+
+        with patch("ci.deploy.subprocess.run", side_effect=request):
+            smoke(
+                {
+                    "component": "backend",
+                    "project_id": "backend",
+                    "alias": "backend.test",
+                    "runtime": {"CORS_ALLOWED_ORIGINS": "https://frontend.test"},
+                }
+            )
+
+    def test_live_frontend_verification_rejects_the_wrong_backend(self):
+        with (
+            patch(
+                "ci.deploy.subprocess.run",
+                return_value=CompletedProcess(
+                    [], 0, '{"backendUrl":"https://wrong.test"}', ""
+                ),
+            ),
+            self.assertRaisesRegex(DeploymentError, "does not match"),
+        ):
+            smoke(
+                {
+                    "component": "frontend",
+                    "project_id": "frontend",
+                    "alias": "frontend.test",
+                    "runtime": {"BACKEND_URL": "https://backend.test"},
+                }
+            )
+
     def test_reusing_a_ready_deployment_does_not_invoke_a_build_or_cli(self):
         class Provider:
             def assign(self, hostname, project, deployment):

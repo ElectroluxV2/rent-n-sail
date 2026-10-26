@@ -48,6 +48,8 @@ The backend allows exactly the corresponding frontend origin. The frontend recei
 
 Backend preview URLs must be accessible to browser API calls. Vercel team-login protection cannot be solved by exposing an automation bypass secret to JavaScript. Configure the backend API's deployment protection deliberately; these workflows do not silently disable project security.
 
+CI verifies the deployed inventory/explicit CORS header and the frontend runtime-config URL using authenticated `vercel curl`, which keeps protection bypass handling inside the trusted CLI. This is not a browser-access policy change and no bypass token is exposed to the client. The cached CLI is also initialized on reuse-only runs for this verification; application compilation remains skipped.
+
 Fork PRs do not receive repository secrets under the normal `pull_request` trigger and cannot deploy a credential-backed stack. There is no privileged `pull_request_target` checkout of fork code.
 
 ## Verification

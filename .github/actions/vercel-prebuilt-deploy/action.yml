@@ -20,7 +20,6 @@ runs:
         } >> "$GITHUB_ENV"
         python3 ci/deploy.py plan
     - name: Set up cached Vercel CLI
-      if: steps.resolve.outputs.mode != 'reuse'
       uses: $/.github/actions/setup-vercel-cli
       env:
         # Security: dependency installation must not receive deployment credentials.
@@ -81,6 +80,10 @@ runs:
         BUILD_ARTIFACT_NAME: rns-${{ env.COMPONENT }}-${{ github.run_id }}-${{ github.run_attempt }}
       # language=bash
       run: python3 ci/deploy.py publish
+    - name: Verify live application and dependency wiring
+      shell: bash
+      # language=bash
+      run: python3 ci/deploy.py smoke
     - name: Failed deployment summary
       if: failure()
       shell: bash

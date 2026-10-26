@@ -536,6 +536,87 @@ def publish(state, provider):
             )
 
 
+def smoke(state):
+    path = "/api/boats" if state["component"] == "backend" else "/runtime-config.json"
+    with tempfile.TemporaryDirectory() as directory:
+        headers = Path(directory) / "headers"
+        command = [
+            "vercel",
+            "curl",
+            "https://" + state["alias"] + path,
+            "--",
+            "--fail",
+            "--silent",
+            "--show-error",
+            "--dump-header",
+            str(headers),
+        ]
+        if state["component"] == "backend":
+            command += ["-H", "Origin: " + state["runtime"]["CORS_ALLOWED_ORIGINS"]]
+        result = subprocess.run(
+            command,
+            env={**os.environ, "VERCEL_PROJECT_ID": state["project_id"]},
+            text=True,
+            capture_output=True,
+        )
+        if result.returncode:
+            detail = result.stderr
+            for value in [
+                *(
+                    os.environ.get(key, "")
+                    for key in ("VERCEL_TOKEN", "NEON_API_KEY", "GITHUB_TOKEN")
+                ),
+                *state["runtime"].values(),
+            ]:
+                if value:
+                    detail = detail.replace(value, "<REDACTED>")
+            detail = re.sub(
+                r"x-vercel-protection-bypass[:=]\s*\S+",
+                "x-vercel-protection-bypass:<REDACTED>",
+                detail,
+                flags=re.IGNORECASE,
+            )
+            print(detail, end="")
+            raise DeploymentError(
+                "Authenticated preview HTTP verification failed; inspect the Vercel runtime logs."
+            )
+        try:
+            data = json.loads(result.stdout)
+        except ValueError:
+            raise DeploymentError(
+                "Preview HTTP verification did not return application JSON."
+            ) from None
+        if state["component"] == "backend":
+            if not isinstance(data, list) or any(
+                not isinstance(row, dict)
+                or not {"id", "name", "daily_rate"} <= row.keys()
+                for row in data
+            ):
+                raise DeploymentError(
+                    "The backend did not return the migrated sample inventory."
+                )
+            origins = [
+                line.partition(":")[2].strip()
+                for line in headers.read_text().splitlines()
+                if line.partition(":")[0].lower() == "access-control-allow-origin"
+            ]
+            if not origins or origins[-1] != state["runtime"]["CORS_ALLOWED_ORIGINS"]:
+                raise DeploymentError(
+                    "The backend did not allow the resolved frontend origin."
+                )
+            print(
+                f"Verified live backend inventory ({len(data)} rows) and explicit CORS origin."
+            )
+        elif data.get("backendUrl") != state["runtime"]["BACKEND_URL"]:
+            raise DeploymentError(
+                "The frontend runtime URL does not match its resolved backend."
+            )
+        else:
+            print(
+                "Verified live frontend runtime configuration matches its resolved backend."
+            )
+
+
 def plan_changes(files):
     shared = ("ci/", ".github/actions/")
     shared_files = {".github/workflows/automatic.yml", ".github/workflows/actions.lock"}
@@ -573,6 +654,7 @@ def main():
             "restore",
             "publish",
             "build-env",
+            "smoke",
         ),
     )
     args = parser.parse_args()
@@ -674,6 +756,8 @@ def main():
         )
     elif command == "restore":
         restore_output(required("ARCHIVE_PATH"), ".vercel/output", state["component"])
+    elif command == "smoke":
+        smoke(state)
     else:
         publish(
             state,
