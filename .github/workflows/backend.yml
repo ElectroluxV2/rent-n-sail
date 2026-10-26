@@ -91,12 +91,7 @@ jobs:
         run: uv run --locked python -m unittest discover -v
 
       - name: Fail if any backend check failed
-        if: >-
-          ${{
-              steps.ruff_lint.outcome == 'failure' ||
-              steps.ruff_format.outcome == 'failure' ||
-              steps.tests.outcome == 'failure'
-          }}
+        if: contains(steps.*.outcome, 'failure')
         # language=bash
         run: |
           echo "::error title=Backend checks failed::One or more backend checks failed. See their annotations and logs."

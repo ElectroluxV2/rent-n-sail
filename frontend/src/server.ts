@@ -19,7 +19,6 @@ const allowedHosts = [
   process.env['VERCEL_PROJECT_PRODUCTION_URL'],
   // Portless supplies the local URL; Angular expects only its hostname.
   portlessUrl ? new URL(portlessUrl).hostname : undefined,
-  'localhost',
 ].filter((host): host is string => Boolean(host));
 const angularApp = new AngularNodeAppEngine({ allowedHosts });
 
@@ -72,6 +71,7 @@ if (isMainModule(import.meta.url) || process.env['pm_id']) {
 }
 
 /**
- * Request handler used by the Angular CLI (for dev-server and during build) or Firebase Cloud Functions.
+ * Request handler used by Angular tooling and exported for Vercel before compilation.
  */
 export const reqHandler = createNodeRequestHandler(app);
+export default reqHandler;

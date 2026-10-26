@@ -5,7 +5,7 @@
   "scripts": {
     "ng": "ng",
     "start": "BACKEND_URL=${BACKEND_URL:-https://backend.localhost} portless frontend ng serve",
-    "start:backend": "portless backend sh -c 'uv run --directory ../backend fastapi dev --port \"$PORT\"'",
+    "start:backend": "CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-https://frontend.localhost} portless backend sh -c 'uv run --directory ../backend fastapi dev --port \"$PORT\"'",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",

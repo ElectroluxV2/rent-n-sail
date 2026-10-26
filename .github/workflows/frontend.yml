@@ -81,13 +81,7 @@ jobs:
         run: pnpm exec ng build
 
       - name: Fail if any frontend check failed
-        if: >-
-          ${{
-              steps.lint.outcome == 'failure' ||
-              steps.format.outcome == 'failure' ||
-              steps.tests.outcome == 'failure' ||
-              steps.build.outcome == 'failure'
-          }}
+        if: contains(steps.*.outcome, 'failure')
         # language=bash
         run: |
           echo "::error title=Frontend checks failed::One or more frontend checks failed. See their annotations and logs."

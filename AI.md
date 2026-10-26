@@ -1,5 +1,14 @@
 # AI usage docs
 
+## 2026-10-26 — PR #14 third review round
+
+- AI assistance: OpenCode (GPT-6.1 Sol) assessed the 11 third-round review threads on [PR #14](https://github.com/Renters-Sailors/rent-n-sail/pull/14) and simplified the configuration, tests, and workflow failure checks.
+- Author attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- Removed all built-in CORS domains and preview patterns. Backend CORS now reads only environment configuration and denies cross-origin access when none is set; the Portless start command supplies its local origin as process configuration. Refactored CORS tests to use explicit, synthetic environment values and an application factory, without deployed-domain fixtures.
+- Moved the Vercel-compatible default SSR export into `src/server.ts` before compilation; retained only the discovery re-export under `api/`. Removed the explicit localhost host allowance and URL scheme check, while retaining protection against serializing URL credentials to the browser. Removed the proxy-specific test and used nullish coalescing with a `never`-returning throw helper, since TypeScript does not support literal throw expressions.
+- Made `.DS_Store` and `Thumbs.db` exclusions repository-wide, and shortened both workflow gates to `contains(steps.*.outcome, 'failure')`, using the outcome array directly rather than joining it into a string.
+- Verification: four backend configuration/CORS tests and two Angular tests passed, along with Ruff, ESLint, formatting, and the Node.js 24 production build. The compiled default handler and API discovery entry are identical and rendered backend data over HTTP for both Portless and Vercel hostnames. Checked all eight backend and sixteen frontend failure combinations, repository-wide system-file ignores, local CORS environment overrides, and YAML language annotations. Action-lock verification passed; actionlint passed with the existing narrow syntax-support exceptions.
+
 ## 2026-10-26 — PR #14 second review round
 
 - AI assistance: OpenCode (GPT-6.1 Sol) assessed the second-round review comments on [PR #14](https://github.com/Renters-Sailors/rent-n-sail/pull/14), including the requested direct frontend-to-backend calls.

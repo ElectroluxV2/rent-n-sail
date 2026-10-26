@@ -42,6 +42,6 @@
 /frontend/typings
 /frontend/**/__screenshots__/
 
-# Frontend system files
-/frontend/**/.DS_Store
-/frontend/**/Thumbs.db
+# System files
+.DS_Store
+Thumbs.db

@@ -17,8 +17,8 @@ const serverConfig: ApplicationConfig = {
         }
 
         const url = new URL('/api', backendUrl);
-        if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) {
-          throw new Error('BACKEND_URL must be an HTTP(S) origin without credentials.');
+        if (url.username || url.password) {
+          throw new Error('BACKEND_URL must not contain credentials.');
         }
 
         inject(TransferState).set(BACKEND_API_URL_STATE_KEY, url.href);

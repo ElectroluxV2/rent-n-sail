@@ -1,3 +1,3 @@
-// Expose Angular's compiled SSR request handler as a Vercel Node.js Function.
+// Vercel's api/* discovery entry; the default handler is defined in src/server.ts.
 // https://vercel.com/docs/functions/runtimes/node-js
-export { reqHandler as default } from '../dist/frontend/server/server.mjs';
+export { default } from '../dist/frontend/server/server.mjs';
