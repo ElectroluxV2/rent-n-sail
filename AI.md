@@ -1,5 +1,9 @@
 # AI usage docs
 
+## 2026-10-26 — Entry workflow and caller job emojis
+
+- AI assistance: OpenCode (GPT-6.1 Sol) prefixed the automatic/manual workflow titles and their caller job names with consistent emojis: 🚀 orchestration, 🗄️ database, ⚙️ backend, and 🌐 frontend. Reusable workflow titles and their inner `Deployment` job labels remain plain; existing step emojis, job IDs, dependencies, and behavior are unchanged. Author attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
 ## 2026-10-26 — Consistent step emojis and deployment debug cleanup
 
 - AI assistance: OpenCode (GPT-6.1 Sol) added explicit emoji-prefixed names to every configured workflow/composite step, using consistent prefixes for matching purposes across database/backend/frontend jobs and shared actions. Author attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`). Job display names, IDs, dependencies, and the minimal detector script are unchanged.

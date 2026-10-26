@@ -1,4 +1,4 @@
-name: Manual backend CI/CD
+name: ⚙️ Manual backend CI/CD
 on:
   workflow_dispatch:
     inputs:
@@ -19,7 +19,7 @@ concurrency:
   queue: max
 jobs:
   backend:
-    name: Backend
+    name: ⚙️ Backend
     uses: ./.github/workflows/reusable-backend.yml
     with:
       branch: ${{ github.ref_name }}

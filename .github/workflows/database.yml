@@ -1,4 +1,4 @@
-name: Manual database CI/CD
+name: 🗄️ Manual database CI/CD
 on:
   workflow_dispatch:
     inputs:
@@ -15,7 +15,7 @@ concurrency:
   queue: max
 jobs:
   database:
-    name: Database
+    name: 🗄️ Database
     uses: ./.github/workflows/reusable-database.yml
     with:
       build: true

@@ -1,4 +1,4 @@
-name: Automatic stack CI/CD
+name: 🚀 Automatic stack CI/CD
 on:
   pull_request:
   push:
@@ -13,16 +13,16 @@ concurrency:
   queue: max
 jobs:
   database:
-    name: Database
+    name: 🗄️ Database
     uses: ./.github/workflows/reusable-database.yml
     secrets: inherit
   backend:
-    name: Backend
+    name: ⚙️ Backend
     needs: database
     uses: ./.github/workflows/reusable-backend.yml
     secrets: inherit
   frontend:
-    name: Frontend
+    name: 🌐 Frontend
     needs: backend
     uses: ./.github/workflows/reusable-frontend.yml
     secrets: inherit
