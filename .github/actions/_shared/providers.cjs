@@ -6,6 +6,27 @@ function aliasName(project, branch, target) {
   return `${project.slice(0, 42)}-preview-${digest}.vercel.app`;
 }
 
+// Standalone Vercel functions return { ok, value, error }; throw like the Neon client does.
+function vercelClient(sdk, env) {
+  const core = new sdk.VercelCore({
+    bearerToken: env.VERCEL_TOKEN,
+    timeoutMs: 60_000,
+    retryConfig: { strategy: 'none' },
+  });
+  const call = (operation) => async (request) => {
+    const result = await operation(core, request);
+    if (!result.ok) throw result.error;
+    return result.value;
+  };
+  return {
+    getProject: call(sdk.projectsGetProject),
+    getDeployments: call(sdk.deploymentsGetDeployments),
+    getDeployment: call(sdk.deploymentsGetDeployment),
+    getAlias: call(sdk.aliasesGetAlias),
+    assignAlias: call(sdk.aliasesAssignAlias),
+  };
+}
+
 function createProviders({ core, env = process.env, clients = {} }) {
   const secrets = Object.entries(env)
     .filter(([name]) => /TOKEN|API_KEY|DATABASE_URL/.test(name))
@@ -18,26 +39,26 @@ function createProviders({ core, env = process.env, clients = {} }) {
     projectId: env.VERCEL_PROJECT_ID,
   };
 
-  async function client(provider) {
-    clients[provider] ??=
-      provider === 'vercel'
-        ? new (await import('@vercel/sdk')).Vercel({
-            bearerToken: env.VERCEL_TOKEN,
-            timeoutMs: 60_000,
-            retryConfig: { strategy: 'none' },
-          })
-        : (await import('@neon/sdk')).createNeonClient({
-            apiKey: env.NEON_API_KEY,
-            throwOnError: true,
-            retries: 0,
-            requestTimeoutMs: 60_000,
-            waitForReadiness: false,
-          });
+  function client(provider) {
+    if (!clients[provider]) {
+      // Checked-in bundle: no install or registry access at run time; see vendor/build.mjs.
+      const sdk = require('./vendor/sdk.cjs');
+      clients[provider] =
+        provider === 'vercel'
+          ? vercelClient(sdk, env)
+          : sdk.createNeonClient({
+              apiKey: env.NEON_API_KEY,
+              throwOnError: true,
+              retries: 0,
+              requestTimeoutMs: 60_000,
+              waitForReadiness: false,
+            });
+    }
     return clients[provider];
   }
 
   async function request(provider, operation, missing = false) {
-    const sdk = await client(provider);
+    const sdk = client(provider);
     try {
       return await operation(sdk);
     } catch (error) {
@@ -98,7 +119,7 @@ function createProviders({ core, env = process.env, clients = {} }) {
 
   async function latestDeployment({ projectId, branch, target }) {
     const { deployments } = await request('vercel', (sdk) =>
-      sdk.deployments.getDeployments({
+      sdk.getDeployments({
         teamId: env.VERCEL_ORG_ID,
         projectId,
         state: 'READY',
@@ -117,7 +138,7 @@ function createProviders({ core, env = process.env, clients = {} }) {
   async function ownedAlias(hostname, projectId) {
     const alias = await request(
       'vercel',
-      (sdk) => sdk.aliases.getAlias({ idOrAlias: hostname, teamId: env.VERCEL_ORG_ID }),
+      (sdk) => sdk.getAlias({ idOrAlias: hostname, teamId: env.VERCEL_ORG_ID }),
       true,
     );
     if (alias && alias.projectId !== projectId)
@@ -127,14 +148,14 @@ function createProviders({ core, env = process.env, clients = {} }) {
 
   async function applicationHostname({ projectId, branch, target }) {
     const { name } = await request('vercel', (sdk) =>
-      sdk.projects.getProject({ idOrName: projectId, teamId: env.VERCEL_ORG_ID }),
+      sdk.getProject({ idOrName: projectId, teamId: env.VERCEL_ORG_ID }),
     );
     return aliasName(name, branch, target);
   }
 
   async function assignAlias(hostname, deploymentId) {
     await request('vercel', (sdk) =>
-      sdk.aliases.assignAlias({
+      sdk.assignAlias({
         id: deploymentId,
         teamId: env.VERCEL_ORG_ID,
         requestBody: { alias: hostname },
@@ -188,7 +209,7 @@ function createProviders({ core, env = process.env, clients = {} }) {
   async function assignApplicationDeploymentFor({ url, ...params }) {
     const selection = { ...defaults, ...params };
     const { id } = await request('vercel', (sdk) =>
-      sdk.deployments.getDeployment({ idOrUrl: new URL(url).hostname, teamId: env.VERCEL_ORG_ID }),
+      sdk.getDeployment({ idOrUrl: new URL(url).hostname, teamId: env.VERCEL_ORG_ID }),
     );
     const hostname = await applicationHostname(selection);
     await ownedAlias(hostname, selection.projectId);

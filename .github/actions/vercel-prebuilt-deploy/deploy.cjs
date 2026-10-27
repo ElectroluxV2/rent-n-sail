@@ -1,6 +1,6 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
-const { createProviders } = require('../provider-script/providers.cjs');
+const { createProviders } = require('../_shared/providers.cjs');
 const { command, buildEnvironment } = require('../_shared/commands.cjs');
 const { packageFrontend, bindRuntime } = require('./output.cjs');
 

@@ -5,7 +5,7 @@ const path = require('node:path');
 const os = require('node:os');
 const deploy = require('../actions/vercel-prebuilt-deploy/deploy.cjs');
 const { packageFrontend } = require('../actions/vercel-prebuilt-deploy/output.cjs');
-const { createProviders } = require('../actions/provider-script/providers.cjs');
+const { createProviders } = require('../actions/_shared/providers.cjs');
 const { commandEnvironment, buildEnvironment } = require('../actions/_shared/commands.cjs');
 
 const root = path.resolve(__dirname, '../..');
@@ -59,15 +59,11 @@ function fixture(handler, overrides = {}) {
   };
   const clients = {
     vercel: {
-      projects: { getProject: method('vercel', 'getProject') },
-      deployments: {
-        getDeployments: method('vercel', 'getDeployments'),
-        getDeployment: method('vercel', 'getDeployment'),
-      },
-      aliases: {
-        getAlias: method('vercel', 'getAlias'),
-        assignAlias: method('vercel', 'assignAlias'),
-      },
+      getProject: method('vercel', 'getProject'),
+      getDeployments: method('vercel', 'getDeployments'),
+      getDeployment: method('vercel', 'getDeployment'),
+      getAlias: method('vercel', 'getAlias'),
+      assignAlias: method('vercel', 'assignAlias'),
     },
     neon: {
       branches: {
@@ -175,7 +171,7 @@ for (const operation of ['database-plan', 'database-branch', 'database-env'])
     const values = {
       NEON_OPERATION: operation,
       NEON_BRANCH_ID: 'preview',
-      PROVIDERS_MODULE: path.join(root, '.github/actions/provider-script/providers.cjs'),
+      PROVIDERS_MODULE: path.join(root, '.github/actions/_shared/providers.cjs'),
     };
     const previous = Object.fromEntries(Object.keys(values).map((key) => [key, process.env[key]]));
     Object.assign(process.env, values);
@@ -236,35 +232,6 @@ test('SDK failures cannot disclose connection details', async () => {
     context.providers.sanitize('key postgresql://owner:password@host/db'),
     '<REDACTED> <REDACTED DATABASE URL>',
   );
-});
-
-test('official SDKs load from the provider action pnpm installation on Node 24', async (t) => {
-  const calls = [];
-  t.mock.method(globalThis, 'fetch', async (input) => {
-    calls.push(new URL(input.url ?? input).hostname);
-    return Response.json(
-      { error: { code: 'forbidden', message: 'postgresql://private' }, message: 'private' },
-      { status: 403 },
-    );
-  });
-  const providers = createProviders({
-    core: coreMock(),
-    env: {
-      VERCEL_TOKEN: 'fixture-token',
-      VERCEL_ORG_ID: 'team',
-      VERCEL_PROJECT_ID: 'project',
-      DEPLOY_TARGET: 'preview',
-      DEPLOY_BRANCH: 'branch',
-      NEON_API_KEY: 'fixture-key',
-      NEON_PROJECT_ID: 'project',
-    },
-  });
-  await assert.rejects(
-    providers.getApplicationDeploymentFor(),
-    /vercel request failed \(HTTP 403\)/,
-  );
-  await assert.rejects(providers.getProductionDatabase(), /neon request failed \(HTTP 403\)/);
-  assert.deepEqual(calls, ['api.vercel.com', 'console.neon.tech']);
 });
 
 test('deployment helpers reject aliases belonging to another project', async () => {
@@ -482,7 +449,7 @@ test('workflows retain the ordered stack without an artifact or restore protocol
     'utf8',
   );
   assert.ok(!/upload-artifact|download-artifact|restore|actions\/checkout/.test(action));
-  assert.equal((action.match(/uses: \$\/\.github\/actions\/provider-script/g) ?? []).length, 2);
+  assert.ok(!/provider-script|pnpm\/setup/.test(action));
   const database = await fs.readFile(
     path.join(root, '.github/workflows/reusable-database.yml'),
     'utf8',

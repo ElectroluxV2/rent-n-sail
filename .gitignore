@@ -46,7 +46,7 @@ __pycache__/
 /frontend/**/__screenshots__/
 
 # Local CI tooling dependencies
-/.github/actions/*/node_modules/
+/.github/actions/**/node_modules/
 
 # System files
 .DS_Store

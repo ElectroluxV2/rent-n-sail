@@ -16,10 +16,10 @@ runs:
   steps:
     - name: 🔗 Resolve Neon resource
       id: operation
-      uses: $/.github/actions/provider-script
+      uses: actions/github-script@v9.0.0
       env:
         NEON_OPERATION: ${{ inputs.operation }}
-        PROVIDERS_MODULE: ${{ github.action_path }}/../provider-script/providers.cjs
+        PROVIDERS_MODULE: ${{ github.action_path }}/../_shared/providers.cjs
       with:
         # language=javascript
         script: |

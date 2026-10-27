@@ -1,5 +1,12 @@
 # AI usage docs
 
+## 2026-10-27 — Checked-in provider SDK bundle; Vercel CLI stays installed
+
+- AI assistance: OpenCode (GPT-6.1 Sol) implemented the user's proposal to bundle provider dependencies with esbuild. Added `.github/actions/_shared/vendor`, which pins `@neon/sdk@7.5.0`, `@vercel/sdk@1.28.51`, and `esbuild@0.28.2` with a pnpm lockfile. Its `build.mjs` writes the checked-in `sdk.cjs` (274 KB, 60 KB gzipped) and `THIRD_PARTY_NOTICES.txt`, because this public repository redistributes the bundled Apache-2.0/MIT code. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- Used Vercel's tree-shakable standalone functions through a small adapter; a bundle of the full Vercel client measured 2.4 MB. Removed the provider-script wrapper and its pnpm install: provider steps call `actions/github-script` directly and need no install, cache, or registry access.
+- Assessed bundling the Vercel CLI and kept it installed through pnpm/setup in build jobs only. Its published `dist` is already an esbuild bundle (317 chunks, 14 MB). It resolves builders such as `@vercel/python` by package name and `require`s them from disk, installing missing builders with npm at run time, and it ships platform binaries (a 162 MB native CLI binary on macOS; esbuild's 10 MB binary). Its installed graph is about 530 MB.
+- Added tests for rebuild drift, license coverage, loading the copied bundle from a directory without `node_modules`, and install-free provider steps. Marked the generated files in `.gitattributes`.
+
 ## 2026-10-27 — Why pnpm/setup cannot cache action-owned lockfiles
 
 - AI assistance: OpenCode (GPT-6.1 Sol) explained from pnpm/setup v3.1.1 source and its bundled `@actions/glob` code that the store cache key is the lockfile's `hashFiles` digest, which skips files outside `GITHUB_WORKSPACE`. Action snapshots live outside the workspace, so the digest is empty and `cache: true` throws. No code was changed. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).

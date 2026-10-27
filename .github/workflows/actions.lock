@@ -16,7 +16,6 @@ workflows:
         - 'actions/github-script@v9.0.0'
         - 'astral-sh/setup-uv@v10.3.2'
         - 'neondatabase/schema-diff-action@v1.0.1'
-        - 'pnpm/setup@v3.1.1'
     '.github/workflows/reusable-frontend.yml':
         - 'actions/checkout@v7.0.1'
         - 'actions/github-script@v9.0.0'

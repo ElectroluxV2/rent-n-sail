@@ -1,0 +1,15 @@
+{
+  "name": "rent-n-sail-provider-sdks",
+  "private": true,
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@neon/sdk": "7.5.0",
+    "@vercel/sdk": "1.28.51"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  },
+  "packageManager": "pnpm@12.15.0"
+}
