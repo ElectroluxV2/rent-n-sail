@@ -11,9 +11,9 @@ pnpm run start:backend
 pnpm start
 ```
 
-[Portless](https://github.com/vercel-labs/portless) exposes the backend at `https://backend.localhost` and the frontend at `https://frontend.localhost`. It assigns free application ports automatically; FastAPI reads the injected `PORT` variable natively. Scripts pass the application commands directly to Portless. Frontend origin defaults live in `src/local-origins.ts`; the backend's explicit local CORS default lives in `backend/main.py`.
+[Portless](https://github.com/vercel-labs/portless) exposes the backend at `https://backend.localhost` and the frontend at `https://frontend.localhost`. It assigns free application ports automatically; FastAPI reads the injected `PORT` variable natively. Scripts pass the application commands directly to Portless. Origin defaults live in `src/local-origins.ts`. The browser calls the backend through `/api/` on the frontend's origin, and the frontend's server forwards those requests to `BACKEND_URL`.
 
-On first use, Portless may request permission to trust its local CA and bind HTTPS port 443. Run it interactively and follow its prompts. For custom proxy ports, TLS modes, hostnames, or worktrees, set `BACKEND_URL` to the backend's actual Portless URL and update `CORS_ALLOWED_ORIGINS` to the frontend's actual origin. No local CA or system trust changes are performed by repository setup.
+On first use, Portless may request permission to trust its local CA and bind HTTPS port 443. Run it interactively and follow its prompts. For custom proxy ports, TLS modes, hostnames, or worktrees, set `BACKEND_URL` to the backend's actual Portless URL, and set the backend's `WEBAUTHN_ORIGIN` and `WEBAUTHN_RP_ID` to the frontend's actual origin and hostname. No local CA or system trust changes are performed by repository setup.
 
 Open `https://frontend.localhost/`. The application will automatically reload when source files change.
 

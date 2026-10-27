@@ -45,7 +45,6 @@ type PasskeyOptionsResponse = AuthTunaAuthenticationOptions | AuthTunaRegistrati
 })
 export class WebAuthFlowComponent {
   private readonly http = inject(HttpClient);
-  private readonly backendApiUrl = inject(BACKEND_API_URL);
 
   protected readonly error = signal<string | null>(null);
   protected readonly isStarting = signal(false);
@@ -150,29 +149,19 @@ export class WebAuthFlowComponent {
   }
 
   private sendFlow(path: string, payload: Record<string, unknown>): Promise<PasskeyFlowResponse> {
-    return firstValueFrom(
-      this.http.post<PasskeyFlowResponse>(this.endpoint(path), payload, { withCredentials: true }),
-    );
+    return firstValueFrom(this.http.post<PasskeyFlowResponse>(BACKEND_API_URL + path, payload));
   }
 
   private loginInit(): Promise<PasskeyOptionsResponse> {
     return firstValueFrom(
-      this.http.get<PasskeyOptionsResponse>(this.endpoint('login/passkey/begin'), {
-        withCredentials: true,
-      }),
+      this.http.get<PasskeyOptionsResponse>(BACKEND_API_URL + 'login/passkey/begin'),
     );
   }
 
   private registerInit(payload: Record<string, unknown>): Promise<PasskeyOptionsResponse> {
     return firstValueFrom(
-      this.http.post<PasskeyOptionsResponse>(this.endpoint('register/passkey/begin'), payload, {
-        withCredentials: true,
-      }),
+      this.http.post<PasskeyOptionsResponse>(BACKEND_API_URL + 'register/passkey/begin', payload),
     );
-  }
-
-  private endpoint(path: string): string {
-    return new URL(path, this.backendApiUrl).href;
   }
 
   private authenticationOptions(

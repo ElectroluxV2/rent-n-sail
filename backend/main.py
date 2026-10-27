@@ -6,7 +6,6 @@ from typing import Annotated
 import uvicorn
 from authtuna import init_settings
 from fastapi import APIRouter, Depends, FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from scalar_fastapi import add_scalar_reference
 from sqlalchemy import Engine, event, select
 from sqlalchemy.orm import Session
@@ -33,7 +32,7 @@ auth_settings = init_settings(
     FERNET_KEYS=os.getenv(
         "FERNET_KEYS", ["MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA="]
     ),
-    SESSION_SAME_SITE="lax",
+    SESSION_SAME_SITE="strict",
     SESSION_SECURE=True,
     MFA_ENABLED=False,
     PASSKEYS_ENABLED=True,
@@ -81,26 +80,13 @@ api_router.include_router(login_router, prefix="/login")
 
 def create_app():
     app = FastAPI()
-    # The middlewares authtuna.init_app adds, but its session cookie is Secure too.
+    # The middlewares authtuna.init_app adds, but with a Strict, Secure session cookie.
     app.add_middleware(DatabaseSessionMiddleware)
     app.add_middleware(
         SessionMiddleware,
         secret_key=auth_settings.ENCRYPTION_PRIMARY_KEY.get_secret_value(),
-        same_site="lax",
+        same_site="strict",
         https_only=True,
-    )
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=[
-            origin.strip()
-            for origin in os.environ.get(
-                "CORS_ALLOWED_ORIGINS", DEFAULT_FRONTEND_ORIGIN
-            ).split(",")
-            if origin.strip()
-        ],
-        allow_credentials=True,
-        allow_methods=["GET", "POST"],
-        allow_headers=["Content-Type"],
     )
     app.include_router(api_router)
     add_scalar_reference(app)

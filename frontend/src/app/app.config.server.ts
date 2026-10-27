@@ -3,12 +3,12 @@ import { provideServerRendering, withRoutes } from '@angular/ssr';
 import { env } from 'node:process';
 import { appConfig } from './app.config';
 import { serverRoutes } from './app.routes.server';
-import { provideBackendApiUrl } from './backend-api-url';
+import { provideServerBackendApi } from './backend-api-url';
 
 const serverConfig: ApplicationConfig = {
   providers: [
     provideServerRendering(withRoutes(serverRoutes)),
-    provideBackendApiUrl(env['BACKEND_URL']),
+    provideServerBackendApi(env['BACKEND_URL']),
   ],
 };
 

@@ -17,8 +17,8 @@ inputs:
       - pull: download the Vercel project configuration and environment for the target with `vercel pull`.
       - package: produce the version's Vercel Build Output: `vercel build` for the backend, or the frontend's
         already validated Angular SSR build, laid out without building again.
-      - settings: resolve the target's settings (database URL, CORS and WebAuthn origins, backend and frontend
-        URLs), export them to the job environment with database URLs masked, and list their names in
+      - settings: resolve the target's settings (database URL, WebAuthn origin, backend and frontend URLs),
+        export them to the job environment with database URLs masked, and list their names in
         INSTANCE_SETTINGS.
       - release: deploy the packaged version with `vercel deploy --prebuilt`, bind those settings as deployment
         environment variables, and point the branch's alias at the new version.

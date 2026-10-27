@@ -19,7 +19,7 @@ pnpm start
 
 Use `https://frontend.localhost` and `https://backend.localhost`. The first interactive run may ask to trust the local CA and bind port 443. See [frontend/README.md](frontend/README.md#development-server) for configuration overrides.
 
-To exercise the sample inventory, set `DATABASE_URL` in your process environment to a direct Neon development/preview connection, apply the [database migrations](database/README.md), then request `/boats` on the backend origin. The backend serves `/` and `/health` directly too; there is no `/api` prefix. Never commit connection strings.
+To exercise the sample inventory, set `DATABASE_URL` in your process environment to a direct Neon development/preview connection, apply the [database migrations](database/README.md), then request `/boats` on the backend origin, or `/api/boats` through the frontend, which forwards `/api/` to the backend. The backend serves `/` and `/health` too. Never commit connection strings.
 
 AuthTuna stores local user and passkey data in `backend/authtuna_dev.db`.
 

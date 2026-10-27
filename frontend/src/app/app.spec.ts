@@ -2,17 +2,12 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { App } from './app';
-import { provideBackendApiUrl } from './backend-api-url';
 
 describe('App', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [App],
-      providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        provideBackendApiUrl('https://backend.test'),
-      ],
+      providers: [provideHttpClient(), provideHttpClientTesting()],
     }).compileComponents();
   });
 
@@ -25,7 +20,7 @@ describe('App', () => {
     const http = TestBed.inject(HttpTestingController);
     fixture.detectChanges();
 
-    http.expectOne('https://backend.test/').flush({ Hello: 'World' });
+    http.expectOne('/api/').flush({ Hello: 'World' });
     await fixture.whenStable();
     fixture.detectChanges();
 
@@ -36,7 +31,7 @@ describe('App', () => {
       .querySelector('form')
       ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     fixture.detectChanges();
-    http.expectOne('https://backend.test/').flush({ Hello: 'World again' });
+    http.expectOne('/api/').flush({ Hello: 'World again' });
     await fixture.whenStable();
     fixture.detectChanges();
 

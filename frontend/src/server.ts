@@ -5,14 +5,17 @@ import {
   writeResponseToNodeResponse,
 } from '@angular/ssr/node';
 import express from 'express';
+import { request as httpRequest } from 'node:http';
+import { request as httpsRequest } from 'node:https';
 import { join } from 'node:path';
-import { DEFAULT_FRONTEND_URL } from './local-origins';
+import { DEFAULT_BACKEND_URL, DEFAULT_FRONTEND_URL } from './local-origins';
 
 const browserDistFolder = join(import.meta.dirname, '../browser');
 
 const app = express();
 const portlessUrl = process.env['PORTLESS_URL'];
 const frontendUrl = process.env['FRONTEND_URL'] ?? DEFAULT_FRONTEND_URL;
+const backendOrigin = new URL(process.env['BACKEND_URL'] ?? DEFAULT_BACKEND_URL).origin;
 // Vercel provides these deployment domains at runtime, without a URL scheme:
 // https://vercel.com/docs/environment-variables/system-environment-variables
 const allowedHosts = [
@@ -26,16 +29,21 @@ const allowedHosts = [
 const angularApp = new AngularNodeAppEngine({ allowedHosts });
 
 /**
- * Example Express Rest API endpoints can be defined here.
- * Uncomment and define endpoints as necessary.
- *
- * Example:
- * ```ts
- * app.get('/api/{*splat}', (req, res) => {
- *   // Handle API request
- * });
- * ```
+ * Forward the browser's API calls to the backend, so they stay on this origin and its cookies stay
+ * first-party. SSR calls the backend directly; see provideServerBackendApi.
  */
+app.use('/api', (req, res, next) => {
+  // Appending the path to the origin keeps every request on the backend's host.
+  const target = new URL(backendOrigin + req.url);
+  const send = target.protocol === 'https:' ? httpsRequest : httpRequest;
+  const headers = { ...req.headers, host: target.host };
+  const upstream = send(target, { method: req.method, headers }, (response) => {
+    res.writeHead(response.statusCode ?? 502, response.headers);
+    response.pipe(res);
+  });
+  upstream.on('error', next);
+  req.pipe(upstream);
+});
 
 /**
  * Serve static files from /browser

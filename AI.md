@@ -1,5 +1,17 @@
 # AI usage docs
 
+## 2026-10-27 — Frontend forwards /api to the backend; no CORS; Strict cookies
+
+- AI assistance: OpenCode (Claude Opus 5.5) moved the browser's API calls onto the frontend's origin at the user's request. Passkey registration had failed because SameSite=Lax cookies aren't sent between the separate `vercel.app` sites. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+  - **Forwarding:** the browser calls `/api/…` on the frontend, and `server.ts` forwards it to `BACKEND_URL` with Node's `http`/`https`. The backend origin and the path are joined, so requests stay on the backend's host. `ng serve` uses the same handler, so `proxy.conf.json` is gone.
+  - **SSR:** a server-only `FetchBackend` subclass sends `/api/` requests straight to `BACKEND_URL`. They keep their relative URL until then, so the browser reuses SSR responses from the HTTP transfer cache. The backend URL no longer travels to the browser.
+  - **Backend:** CORS, `CORS_ALLOWED_ORIGINS`, and `test_cors.py` are gone. Both session cookies are SameSite=Strict, Secure, and HttpOnly.
+  - **Deployment settings:** the backend gets `DATABASE_URL`, `WEBAUTHN_ORIGIN`, and `WEBAUTHN_RP_ID`. The frontend keeps `BACKEND_URL` and `FRONTEND_URL`.
+- Validation: backend ruff and tests passed, and so did frontend oxfmt, ESLint, the unit test, and the production build. Locally, both a production server and `ng serve` forwarded `/api/`:
+  - **SSR:** it rendered the backend response for a page host that doesn't resolve, so it called the backend directly. It stored the response in the transfer state under `/api/`.
+  - **Host check:** `/api//example.com/` stayed on the backend (404).
+  - **Passkey begin** through the frontend set `session=…; httponly; samesite=strict; secure`.
+
 ## 2026-10-27 — Secure session cookies and a README for the Vercel output
 
 - AI assistance: OpenCode (Claude Opus 5.5) made both backend cookies Secure, HttpOnly, and SameSite=Lax at the user's request. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).

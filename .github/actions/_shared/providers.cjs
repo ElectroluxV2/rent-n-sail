@@ -199,7 +199,7 @@ function createProviders({ core, exec, env = process.env }) {
   async function reserveServiceAlias(projectId) {
     const hostname = await serviceAddress(projectId);
     if (target === 'preview' && !(await ownedServiceAlias(hostname, projectId))) {
-      // Reserve ownership before trusting this exact origin for CORS.
+      // Reserve ownership before trusting this exact origin for passkeys.
       const production = await latestServiceDeployment(projectId, 'production');
       await assignServiceAlias(hostname, production.uid);
     }
@@ -209,9 +209,8 @@ function createProviders({ core, exec, env = process.env }) {
   async function getBackendServiceSettings() {
     const frontend = await reserveServiceAlias(env.VERCEL_FRONTEND_PROJECT_ID);
     return {
-      CORS_ALLOWED_ORIGINS: `https://${frontend}`,
       DATABASE_URL: await getDatabaseConnection(true),
-      // Passkey ceremonies run on the frontend origin that calls this backend.
+      // Passkey ceremonies run on the frontend origin, which forwards the browser's calls here.
       WEBAUTHN_ORIGIN: `https://${frontend}`,
       WEBAUTHN_RP_ID: frontend,
     };
@@ -241,9 +240,9 @@ function createProviders({ core, exec, env = process.env }) {
     await vercelCli(['build', '--environment', target]);
   }
 
-  // Vercel's Angular preset deploys only static browser output, but the runtime BACKEND_URL reaches
-  // the browser through SSR. frontend/vercel-output holds the Build Output configuration; this adds
-  // the already validated Angular build: https://vercel.com/docs/build-output-api
+  // Vercel's Angular preset deploys only static browser output, but the SSR server also forwards the
+  // browser's /api/ calls to BACKEND_URL. frontend/vercel-output holds the Build Output configuration;
+  // this adds the already validated Angular build: https://vercel.com/docs/build-output-api
   async function packageFrontendServiceOutput() {
     const dist = 'frontend/dist/frontend';
     await fs.cp('frontend/vercel-output', '.vercel/output', {

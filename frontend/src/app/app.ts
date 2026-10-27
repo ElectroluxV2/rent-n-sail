@@ -1,5 +1,5 @@
 import { httpResource } from '@angular/common/http';
-import { Component, inject, signal } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { FormRoot, form } from '@angular/forms/signals';
 import { RouterOutlet } from '@angular/router';
 import { BACKEND_API_URL } from './backend-api-url';
@@ -17,8 +17,7 @@ interface BackendHello {
 })
 export class App {
   protected readonly title = signal('frontend');
-  private readonly backendApiUrl = inject(BACKEND_API_URL);
-  protected readonly backendHello = httpResource<BackendHello>(() => this.backendApiUrl);
+  protected readonly backendHello = httpResource<BackendHello>(() => BACKEND_API_URL);
   protected readonly checkForm = form(signal({}), {
     submission: {
       action: async () => {

@@ -2,7 +2,7 @@
 
 These files are the frontend's [Vercel Build Output API](https://vercel.com/docs/build-output-api) configuration. The frontend is deployed with `vercel deploy --prebuilt`, which uploads a finished `.vercel/output` directory, so Vercel never builds it.
 
-Vercel's Angular preset would deploy only the static browser files. This app needs server-side rendering, because the server hands the runtime `BACKEND_URL` to the browser. The output is therefore one SSR function plus static files.
+Vercel's Angular preset would deploy only the static browser files. This app also needs its server: it renders pages, and it forwards the browser's `/api/` calls to the backend (`BACKEND_URL`), so they stay on the frontend's origin. The output is therefore one SSR function plus static files.
 
 ## How `.vercel/output` is assembled
 
