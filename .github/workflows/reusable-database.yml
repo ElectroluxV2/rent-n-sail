@@ -8,6 +8,9 @@ on:
       target:
         type: string
         default: ""
+      build:
+        type: boolean
+        default: false
     secrets:
       NEON_API_KEY:
         required: false
@@ -42,6 +45,16 @@ jobs:
         uses: $/.github/actions/component-changes
         with:
           path: database/
+      - name: 🧭 Select migration path
+        uses: actions/github-script@v9.0.0
+        env:
+          BUILD: ${{ inputs.build || steps.changes.outputs.changed == 'true' || github.event.action == 'opened' || github.event.action == 'reopened' }}
+        with:
+          # language=javascript
+          script: |
+            const build = process.env.BUILD === 'true';
+            core.info(build ? 'Migration path: install migration tools and apply pending migrations.' : 'No database changes: skip migration tools and leave the schema untouched.');
+            core.exportVariable('BUILD_REQUESTED', String(build));
       - name: 🌱 Ensure preview branch
         id: branch
         if: env.DEPLOY_TARGET == 'preview'
@@ -52,6 +65,7 @@ jobs:
           operation: database-branch
       - name: 🔗 Resolve production parent
         id: plan
+        if: env.DEPLOY_TARGET == 'production' || env.BUILD_REQUESTED == 'true'
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
         uses: $/.github/actions/neon-operation
@@ -68,20 +82,24 @@ jobs:
             core.info(`Selected ${process.env.DEPLOY_TARGET} database branch: ${process.env.NEON_BRANCH_ID}`);
             core.setOutput('branch_id', process.env.NEON_BRANCH_ID);
       - name: 📥 Checkout migration source
+        if: env.BUILD_REQUESTED == 'true'
         uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
       - name: ⚙️ Set up uv and Python
         uses: astral-sh/setup-uv@v10.3.2
+        if: env.BUILD_REQUESTED == 'true'
         with:
           working-directory: database
           enable-cache: true
           cache-python: true
           activate-environment: true
       - name: 📦 Install migration tools
+        if: env.BUILD_REQUESTED == 'true'
         # language=bash
         run: uv sync --directory database --locked
       - name: 🔐 Resolve migration credentials
+        if: env.BUILD_REQUESTED == 'true'
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
           NEON_BRANCH_ID: ${{ steps.reference.outputs.branch_id }}
@@ -89,10 +107,11 @@ jobs:
         with:
           operation: database-env
       - name: 🚀 Apply migrations
+        if: env.BUILD_REQUESTED == 'true'
         # language=bash
         run: uv run --directory database --locked alembic upgrade head
       - name: 📝 Comment schema changes
-        if: github.event_name == 'pull_request' && env.DEPLOY_TARGET == 'preview'
+        if: env.BUILD_REQUESTED == 'true' && github.event_name == 'pull_request' && env.DEPLOY_TARGET == 'preview'
         uses: neondatabase/schema-diff-action@v1.0.1
         with:
           api_key: ${{ secrets.NEON_API_KEY }}
@@ -107,4 +126,5 @@ jobs:
         with:
           # language=javascript
           script: |
-            await core.summary.addHeading('Database deployment').addRaw(`Neon branch: ${process.env.NEON_BRANCH_ID}\nMigrations: Alembic upgrade head completed (pending revisions only).`, true).write();
+            const migrations = process.env.BUILD_REQUESTED === 'true' ? 'Alembic upgrade head completed (pending revisions only).' : 'skipped (no database changes).';
+            await core.summary.addHeading('Database deployment').addRaw(`Neon branch: ${process.env.NEON_BRANCH_ID}\nMigrations: ${migrations}`, true).write();

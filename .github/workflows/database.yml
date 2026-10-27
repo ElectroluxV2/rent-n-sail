@@ -20,4 +20,5 @@ jobs:
     with:
       branch: ${{ github.ref_name }}
       target: ${{ inputs.target }}
+      build: true
     secrets: inherit
