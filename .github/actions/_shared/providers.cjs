@@ -41,8 +41,8 @@ function createProviders({ core, env = process.env, clients = {} }) {
 
   function client(provider) {
     if (!clients[provider]) {
-      // Checked-in bundle: no install or registry access at run time; see vendor/src/build.mjs.
-      const sdk = require('./vendor/sdk.cjs');
+      // Checked-in bundle: no install or registry access at run time; see vendor/build.mjs.
+      const sdk = require('./vendor/dist/sdk.cjs');
       clients[provider] =
         provider === 'vercel'
           ? vercelClient(sdk, env)

@@ -1,5 +1,10 @@
 # AI usage docs
 
+## 2026-10-27 — Vendored SDK output moved to `dist/`
+
+- AI assistance: OpenCode (Claude Opus 5.5) restructured `.github/actions/_shared/vendor` at the user's request. Generated output now lives in `dist/` (`dist/sdk.cjs`, `dist/THIRD_PARTY_NOTICES.txt`), replacing the earlier `src/` directory. The hand-written `build.mjs` and `sdk.mjs` moved back to the vendor root next to the pnpm project files. `build.mjs` writes to `dist/` and no longer takes an output-directory argument, which only the removed drift test used. `providers.cjs` loads `./vendor/dist/sdk.cjs`, and `.gitattributes` marks `vendor/dist/**` as generated. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- Validation: `pnpm run build` wrote only into `dist/`. The rebuilt `sdk.cjs` differs from the moved file only in its banner line, and the notices are byte-identical. With a mocked `fetch`, `providers.cjs` loaded the bundle and both the Vercel and Neon clients reported their 403 errors.
+
 ## 2026-10-27 — Removed the local CI tooling tests
 
 - AI assistance: OpenCode (Claude Opus 5.5) removed all four local Node tests under `.github/tests` at the user's request: `cicd.test.cjs`, `component-changes.test.cjs`, `provider-sdk-bundle.test.cjs`, and `setup-vercel-cli.test.cjs`. It also dropped their mentions from `.github/CI.md`: the note on local regression tests, the SDK bundle's rebuild check, and the vendor install and `node --test` verification commands. The backend pytest command and the ShellCheck guidance remain. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).

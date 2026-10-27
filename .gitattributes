@@ -1,2 +1,1 @@
-/.github/actions/_shared/vendor/sdk.cjs linguist-generated=true
-/.github/actions/_shared/vendor/THIRD_PARTY_NOTICES.txt linguist-generated=true
+/.github/actions/_shared/vendor/dist/** linguist-generated=true
