@@ -1,5 +1,10 @@
 # AI usage docs
 
+## 2026-10-27 — Prepare European hosting resources
+
+- AI assistance: Junie (gpt-6-luna) inspected the GitHub, Vercel, and Neon configuration; provisioned Vercel projects `rent-n-sail-backend-eu` and `rent-n-sail-frontend-eu`, and Neon project `rent-n-sail-db-eu` in Frankfurt (`aws-eu-central-1`). Vercel’s Neon Marketplace integration was required because the only Neon organization is Vercel-managed. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- The new projects are staged with the repository’s backend/frontend roots and the Neon resource connected to the new backend. The existing Neon production branch had no application tables. GitHub deployment IDs have not yet been switched, no production pipeline has been run, and legacy projects have not been deleted pending the deployment cutover.
+
 ## 2026-10-27 — Unit-test the backend API URL interceptor
 
 - AI assistance: Junie (gpt-6-luna) added unit coverage for `backendApiInterceptor`: prefixing a relative URL while retaining its query string, avoiding a duplicate `/api/` prefix, and passing a different-origin URL through unchanged. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).

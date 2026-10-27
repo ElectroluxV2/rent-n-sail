@@ -4,6 +4,8 @@ This project follows [Neon's FastAPI/SQLAlchemy migration guide](https://neon.co
 
 The initial migration creates `boats` with a unique name, non-negative daily rate, and a `Demo sailboat` sample record. Repeating `alembic upgrade head` does not insert duplicate sample rows. `/boats` on the backend origin reads this inventory.
 
+The production Neon project is in Frankfurt (`aws-eu-central-1`), the nearest available region to Poland.
+
 Set `DATABASE_URL` to your development/preview branch's direct connection string, then run from this directory:
 
 ```bash
