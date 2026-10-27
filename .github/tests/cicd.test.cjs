@@ -238,8 +238,11 @@ test('frontend packaging uses the validated browser and SSR bundles', async (t) 
   await fs.mkdir(path.join(dist, 'browser'));
   await fs.writeFile(path.join(dist, 'server/server.mjs'), 'export default () => {};');
   await fs.writeFile(path.join(dist, 'browser/main.js'), 'compiled browser');
+  await fs.writeFile(path.join(dist, 'browser/index.csr.html'), '<app-root></app-root>');
   const output = path.join(directory, 'output');
   await packageFrontend(dist, output);
+  await assert.rejects(fs.access(path.join(output, 'static/index.csr.html')), { code: 'ENOENT' });
+  await fs.access(path.join(output, 'functions/ssr.func/browser/index.csr.html'));
   assert.equal(await fs.readFile(path.join(output, 'static/main.js'), 'utf8'), 'compiled browser');
   assert.equal(
     JSON.parse(await fs.readFile(path.join(output, 'functions/ssr.func/.vc-config.json'))).handler,

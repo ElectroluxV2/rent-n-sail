@@ -6,7 +6,11 @@ async function packageFrontend(dist, output) {
   // function, browser assets, and routing: https://vercel.com/docs/build-output-api
   const fn = path.join(output, 'functions/ssr.func');
   await fs.cp(dist, fn, { recursive: true });
-  await fs.cp(path.join(dist, 'browser'), path.join(output, 'static'), { recursive: true });
+  await fs.cp(path.join(dist, 'browser'), path.join(output, 'static'), {
+    recursive: true,
+    // The client-only index must not become Vercel's static homepage ahead of SSR.
+    filter: (source) => path.basename(source) !== 'index.csr.html',
+  });
   await fs.writeFile(
     path.join(fn, '.vc-config.json'),
     JSON.stringify({
