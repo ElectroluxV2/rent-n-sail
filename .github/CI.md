@@ -8,7 +8,7 @@ Each reusable workflow calls `.github/actions/component-changes` once, with only
 
 Logs show the searched substring, escaped changed paths with forced `jq -C` colors, and the plain boolean match. Matching uses the uncolored JSON. There is no GitHub comparison API or 300-file cap: large diffs use their actual paths rather than forcing unrelated applications to build. Git failures fail the step instead of reporting "unchanged".
 
-Callers invoke detection for pushes and PR `synchronize` events. Initial PR `opened`/`reopened` events explicitly run full application validation/builds; manual application runs use their existing build checkbox. These choices are outside the detector. Application build decisions use only the latest push, not the cumulative PR diff. Shared CI-only or documentation changes do not implicitly rebuild applications. Database change detection is informational: the database job always applies pending migrations.
+Detection runs unconditionally. Pushes and PR `synchronize` events supply their latest `before`/`after` range; when no push range exists, both endpoints default to the current commit, producing an empty diff. Initial PR `opened`/`reopened` events explicitly run full application validation/builds; manual application runs use their existing build checkbox. These build choices remain outside the detector. Shared CI-only or documentation changes do not implicitly rebuild applications. Database change detection is informational: the database job always applies pending migrations.
 
 The frontend is compiled once during validation. The deployment action packages that existing SSR/browser output directly using Vercel's Build Output API. There is no separate frontend build controller or second Vercel frontend build; `frontend/vercel.json` disables Vercel's build command. Backend output still uses Vercel's Python builder.
 
@@ -16,7 +16,7 @@ The frontend is compiled once during validation. The deployment action packages 
 
 Local actions and reusable workflows use `$/` references, so they resolve to their defining repository's running commit without requiring a workspace checkout. Source is fetched only before application validation/builds or database migration tools. Both automatic and manual reuse-only application runs need no checkout, toolchain setup, or Vercel CLI.
 
-Every target is serialized across automatic/manual runs with a non-cancelling queue. Each application/database also has a shared per-target concurrency group and a GitHub Environment.
+Each caller owns one non-cancelling stack queue per Git ref, shared across automatic/manual entry points. Reusable jobs do not add nested queues. GitHub deployment-environment names are unchanged (including production environments); queue identity does not override their settings. Deployment-target selection uses GitHub's documented `case(...)` expression.
 
 ## Step names
 

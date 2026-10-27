@@ -24,19 +24,15 @@ jobs:
   frontend:
     name: Deployment
     runs-on: ubuntu-26.04
-    concurrency:
-      group: &environment frontend-${{ (inputs.target || (github.event_name == 'push' && 'production' || 'preview')) == 'production' && 'production' || (inputs.branch || github.head_ref || github.ref_name) }}
-      cancel-in-progress: false
-      queue: max
     environment:
-      name: *environment
+      name: frontend-${{ case(inputs.target == 'production' || (inputs.target == '' && github.event_name == 'push'), 'production', inputs.branch || github.head_ref || github.ref_name) }}
       url: ${{ steps.deploy.outputs.url }}
     outputs:
       url: ${{ steps.deploy.outputs.url }}
     env:
       COMPONENT: frontend
       DEPLOY_BRANCH: ${{ inputs.branch || github.head_ref || github.ref_name }}
-      DEPLOY_TARGET: ${{ inputs.target || (github.event_name == 'push' && 'production' || 'preview') }}
+      DEPLOY_TARGET: ${{ case(inputs.target != '', inputs.target, github.event_name == 'push', 'production', 'preview') }}
       VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
       VERCEL_FRONTEND_PROJECT_ID: ${{ vars.VERCEL_FRONTEND_PROJECT_ID }}
       VERCEL_BACKEND_PROJECT_ID: ${{ vars.VERCEL_BACKEND_PROJECT_ID }}
@@ -45,7 +41,6 @@ jobs:
     steps:
       - name: 🔍 Check frontend changes
         id: changes
-        if: github.event_name == 'push' || github.event.action == 'synchronize'
         uses: $/.github/actions/component-changes
         with:
           path: frontend/

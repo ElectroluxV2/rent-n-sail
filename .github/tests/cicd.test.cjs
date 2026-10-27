@@ -396,7 +396,13 @@ test('workflows retain the ordered stack without an artifact or restore protocol
       'utf8',
     );
     assert.match(workflow, /runs-on: ubuntu-26\.04/);
-    assert.match(workflow, /name: \*environment/);
+    assert.match(workflow, /DEPLOY_TARGET: \$\{\{ case\(/);
+    assert.ok(!workflow.includes('concurrency:'));
+    assert.ok(!workflow.includes("if: github.event_name == 'push'"));
     assert.ok(!/uses:.*reusable-(backend|frontend|database)/.test(workflow));
+  }
+  for (const caller of ['stack', 'backend', 'frontend', 'database']) {
+    const workflow = await fs.readFile(path.join(root, `.github/workflows/${caller}.yml`), 'utf8');
+    assert.match(workflow, /group: stack-\$\{\{ github.head_ref \|\| github.ref_name \}\}/);
   }
 });

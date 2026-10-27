@@ -28,19 +28,15 @@ jobs:
   backend:
     name: Deployment
     runs-on: ubuntu-26.04
-    concurrency:
-      group: &environment backend-${{ (inputs.target || (github.event_name == 'push' && 'production' || 'preview')) == 'production' && 'production' || (inputs.branch || github.head_ref || github.ref_name) }}
-      cancel-in-progress: false
-      queue: max
     environment:
-      name: *environment
+      name: backend-${{ case(inputs.target == 'production' || (inputs.target == '' && github.event_name == 'push'), 'production', inputs.branch || github.head_ref || github.ref_name) }}
       url: ${{ steps.deploy.outputs.url }}
     outputs:
       url: ${{ steps.deploy.outputs.url }}
     env:
       COMPONENT: backend
       DEPLOY_BRANCH: ${{ inputs.branch || github.head_ref || github.ref_name }}
-      DEPLOY_TARGET: ${{ inputs.target || (github.event_name == 'push' && 'production' || 'preview') }}
+      DEPLOY_TARGET: ${{ case(inputs.target != '', inputs.target, github.event_name == 'push', 'production', 'preview') }}
       NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID || secrets.NEON_PROJECT_ID }}
       NEON_PARENT_BRANCH_ID: ${{ vars.NEON_PARENT_BRANCH_ID }}
       NEON_DATABASE_NAME: ${{ vars.NEON_DATABASE_NAME || 'neondb' }}
@@ -54,7 +50,6 @@ jobs:
     steps:
       - name: 🔍 Check backend changes
         id: changes
-        if: github.event_name == 'push' || github.event.action == 'synchronize'
         uses: $/.github/actions/component-changes
         with:
           path: backend/

@@ -16,8 +16,8 @@ runs:
       shell: bash
       env:
         CHECK_PATH: ${{ inputs.path }}
-        BEFORE: ${{ github.event.before }}
-        AFTER: ${{ github.event.after }}
+        BEFORE: ${{ github.event.before || github.sha }}
+        AFTER: ${{ github.event.after || github.sha }}
         GH_TOKEN: ${{ github.token }}
       # language=bash
       run: bash "$GITHUB_ACTION_PATH/detect.sh"
