@@ -11,6 +11,12 @@
   - **SSR:** it rendered the backend response for a page host that doesn't resolve, so it called the backend directly. It stored the response in the transfer state under `/api/`.
   - **Host check:** `/api//example.com/` stayed on the backend (404).
   - **Passkey begin** through the frontend set `session=…; httponly; samesite=strict; secure`.
+- Live validation: commit `5e75fae` passed stack run `40568735356`. The backend now receives only `DATABASE_URL`, `WEBAUTHN_ORIGIN`, and `WEBAUTHN_RP_ID`, and it sends no CORS headers. Headless Chrome with a virtual WebAuthn authenticator then ran the full flow on the preview:
+  - **Load:** the page rendered "Backend says: World" without any `/api` request, because the browser hit the transfer cache.
+  - **Login without a passkey:** offered registration.
+  - **Registration:** succeeded and stored `session` and `session_token` on the frontend's domain, both SameSite=Strict, Secure, and HttpOnly.
+  - **Login with the new passkey:** "Welcome …".
+  - **API calls:** every one went to `/api/…` on the frontend's origin.
 
 ## 2026-10-27 — Secure session cookies and a README for the Vercel output
 
