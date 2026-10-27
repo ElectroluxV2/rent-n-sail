@@ -2,7 +2,6 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
-import { BACKEND_API_URL } from '../backend-api-url';
 
 interface AuthTunaAuthenticationOptions {
   challenge: string;
@@ -149,18 +148,16 @@ export class WebAuthFlowComponent {
   }
 
   private sendFlow(path: string, payload: Record<string, unknown>): Promise<PasskeyFlowResponse> {
-    return firstValueFrom(this.http.post<PasskeyFlowResponse>(BACKEND_API_URL + path, payload));
+    return firstValueFrom(this.http.post<PasskeyFlowResponse>(path, payload));
   }
 
   private loginInit(): Promise<PasskeyOptionsResponse> {
-    return firstValueFrom(
-      this.http.get<PasskeyOptionsResponse>(BACKEND_API_URL + 'login/passkey/begin'),
-    );
+    return firstValueFrom(this.http.get<PasskeyOptionsResponse>('login/passkey/begin'));
   }
 
   private registerInit(payload: Record<string, unknown>): Promise<PasskeyOptionsResponse> {
     return firstValueFrom(
-      this.http.post<PasskeyOptionsResponse>(BACKEND_API_URL + 'register/passkey/begin', payload),
+      this.http.post<PasskeyOptionsResponse>('register/passkey/begin', payload),
     );
   }
 

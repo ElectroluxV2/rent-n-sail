@@ -1,5 +1,19 @@
 # AI usage docs
 
+## 2026-10-27 — Unit-test the backend API URL interceptor
+
+- AI assistance: Junie (gpt-6-luna) added unit coverage for `backendApiInterceptor`: prefixing a relative URL while retaining its query string, avoiding a duplicate `/api/` prefix, and passing a different-origin URL through unchanged. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-27 — Review: simplify the backend URL interceptor
+
+- AI assistance: Junie (gpt-6-luna) replaced the scheme-matching regex and protocol-relative URL check with a URL origin comparison. Relative requests resolve against a placeholder origin and receive the `/api/` prefix; requests resolving to another origin pass through unchanged. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-27 — Review: route backend requests through an interceptor
+
+- AI assistance: Junie (gpt-6-luna) implemented the passkey URL-routing suggestion and checked the SSR interceptor suggestion in the newly published PR #14 review comments. Passkey request paths no longer include `/api/` in the component; `backendApiInterceptor` adds the frontend API prefix. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- SSR URL rewriting stays in the final `FetchBackend`: moving it into the regular interceptor chain changes Angular's transfer-cache key from `/api/` to the backend origin, causing the browser to miss the SSR response and issue another request.
+- Validation: frontend production build, ESLint, formatting, and SSR smoke check passed. SSR rendered the mock response after a direct `GET /` to the backend and serialized the transfer-cache URL as `/api/`.
+
 ## 2026-10-27 — Frontend forwards /api to the backend; no CORS; Strict cookies
 
 - AI assistance: OpenCode (Claude Opus 5.5) moved the browser's API calls onto the frontend's origin at the user's request. Passkey registration had failed because SameSite=Lax cookies aren't sent between the separate `vercel.app` sites. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).

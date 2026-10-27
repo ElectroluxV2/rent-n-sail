@@ -2,7 +2,7 @@ import { httpResource } from '@angular/common/http';
 import { Component, signal } from '@angular/core';
 import { FormRoot, form } from '@angular/forms/signals';
 import { RouterOutlet } from '@angular/router';
-import { BACKEND_API_URL } from './backend-api-url';
+import { BACKEND_API_PREFIX } from './backend-api-url';
 import { WebAuthFlowComponent } from './web-auth-flow/web-auth-flow.component';
 
 interface BackendHello {
@@ -17,7 +17,7 @@ interface BackendHello {
 })
 export class App {
   protected readonly title = signal('frontend');
-  protected readonly backendHello = httpResource<BackendHello>(() => BACKEND_API_URL);
+  protected readonly backendHello = httpResource<BackendHello>(() => BACKEND_API_PREFIX);
   protected readonly checkForm = form(signal({}), {
     submission: {
       action: async () => {
