@@ -1,5 +1,10 @@
 # AI usage docs
 
+## 2026-10-27 — Frontend packaging moved into providers.cjs
+
+- AI assistance: OpenCode (Claude Opus 5.5) answered why `component-instance/output.cjs` existed. It lays the already-built Angular SSR output out in Vercel's Build Output API format. The pinned Vercel CLI's Angular preset deploys only static browser output (`dist/<app>/browser` with an `/index.html` fallback), and the runtime `BACKEND_URL` reaches the browser only through SSR, so the code stays. The separate file was a leftover of `vercel-prebuilt-deploy`: the code is now `packageFrontendServiceOutput` in `providers.cjs`, next to the other Vercel helpers, and `output.cjs` is deleted. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- Validation: oxfmt, actionlint, and the throwaway nine-scenario check passed. Its frontend scenario copied browser assets into `static/` without the client-only index.
+
 ## 2026-10-27 — Unified component workflow implemented
 
 - AI assistance: OpenCode (Claude Opus 5.5) implemented `.github/COMPONENT-WORKFLOW.md` with the user's review names and answers: `BUILD_NEEDED`, 🧭 Choose strategy, 🚀 Release update, and "production source". The output stays `instance_id`, because production runs have no preview. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).

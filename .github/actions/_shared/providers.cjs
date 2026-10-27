@@ -1,4 +1,6 @@
 const { createHash } = require('node:crypto');
+const fs = require('node:fs/promises');
+const path = require('node:path');
 // Checked-in bundle: no install or registry access at run time; see vendor/package.json.
 const sdk = require('./vendor/dist/sdk.cjs');
 
@@ -241,6 +243,37 @@ function createProviders({ core, exec, env = process.env }) {
     await vercelCli(['build', '--environment', target]);
   }
 
+  // Vercel's Angular preset deploys only static browser output, but the runtime BACKEND_URL reaches
+  // the browser through SSR. The quality gates already compiled Angular, so this only lays out its
+  // SSR function, browser assets, and routes: https://vercel.com/docs/build-output-api
+  async function packageFrontendServiceOutput() {
+    const dist = 'frontend/dist/frontend';
+    const fn = '.vercel/output/functions/ssr.func';
+    await fs.cp(dist, fn, { recursive: true });
+    await fs.cp(path.join(dist, 'browser'), '.vercel/output/static', {
+      recursive: true,
+      // The client-only index must not become Vercel's static homepage ahead of SSR.
+      filter: (source) => path.basename(source) !== 'index.csr.html',
+    });
+    await fs.writeFile(
+      path.join(fn, '.vc-config.json'),
+      JSON.stringify({
+        runtime: `nodejs${process.versions.node.split('.')[0]}.x`,
+        handler: 'server/server.mjs',
+        launcherType: 'Nodejs',
+        supportsResponseStreaming: true,
+      }),
+    );
+    await fs.writeFile(
+      '.vercel/output/config.json',
+      JSON.stringify({
+        version: 3,
+        routes: [{ handle: 'filesystem' }, { src: '/(.*)', dest: '/ssr' }],
+      }),
+    );
+    core.info('Packaged the validated Angular SSR build; no second build.');
+  }
+
   async function publishServiceDeployment(settingNames) {
     const args = [
       'deploy',
@@ -270,6 +303,7 @@ function createProviders({ core, exec, env = process.env }) {
     getFrontendServiceSettings,
     pullServiceConfig,
     buildServiceOutput,
+    packageFrontendServiceOutput,
     publishServiceDeployment,
   };
 }

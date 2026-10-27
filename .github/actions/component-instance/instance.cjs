@@ -1,8 +1,7 @@
 const { createProviders } = require('../_shared/providers.cjs');
-const { packageFrontend } = require('./output.cjs');
 
 // The operations below use only these names; components differ only in the provider helpers behind them.
-function componentFor({ core, env, providers }) {
+function componentFor({ env, providers }) {
   if (env.COMPONENT === 'database')
     return {
       // Migrations change the instance in place, so an update needs one first.
@@ -23,10 +22,7 @@ function componentFor({ core, env, providers }) {
     resolveSettings,
     pullConfig: providers.pullServiceConfig,
     packageVersion: frontend
-      ? async () => {
-          await packageFrontend('frontend/dist/frontend', '.vercel/output');
-          core.info('Packaged the validated Angular SSR build; no second build.');
-        }
+      ? providers.packageFrontendServiceOutput
       : providers.buildServiceOutput,
     releaseUpdate: providers.publishServiceDeployment,
   };
@@ -94,7 +90,7 @@ module.exports = async ({ core, exec, env = process.env }) => {
   const operation = env.INSTANCE_OPERATION;
   try {
     const providers = createProviders({ core, exec, env });
-    await operations[operation]({ core, env, component: componentFor({ core, env, providers }) });
+    await operations[operation]({ core, env, component: componentFor({ env, providers }) });
   } catch (error) {
     await summarize(core, env, [
       ['Result', `❌ ${operation} failed`],
