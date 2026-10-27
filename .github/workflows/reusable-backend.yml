@@ -30,7 +30,7 @@ jobs:
     name: Deployment
     runs-on: ubuntu-26.04
     environment:
-      name: ${{ inputs.target == 'production' && 'backend-prod' || 'backend-prev' }}
+      name: ${{ inputs.target == 'production' && 'backend-production' || 'backend-preview' }}
       url: ${{ steps.report.outputs.address }}
     outputs:
       instance_id: ${{ steps.report.outputs.instance_id }}

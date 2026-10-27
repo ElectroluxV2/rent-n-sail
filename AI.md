@@ -1,5 +1,9 @@
 # AI usage docs
 
+## 2026-10-27 — Clarify component deployment environment names
+
+- AI assistance: Junie (gpt-6-luna) renamed the component-specific GitHub deployment environments to `database-preview`/`database-production`, `backend-preview`/`backend-production`, and `frontend-preview`/`frontend-production`; deployment targets remain `preview`/`production`. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
 ## 2026-10-27 — Separate GitHub deployment environments by component
 
 - AI assistance: Junie (gpt-6-luna) changed the database, backend, and frontend reusable workflows to publish deployments into distinct GitHub Environments: `database-prev`/`database-prod`, `backend-prev`/`backend-prod`, and `frontend-prev`/`frontend-prod`. The existing `preview`/`production` deployment target passed to component provisioning remains unchanged. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
