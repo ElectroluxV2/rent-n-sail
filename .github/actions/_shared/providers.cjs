@@ -114,21 +114,59 @@ function createProviders({ core, env = process.env }) {
   }
 
   async function getServiceDeploymentFor(projectId = env.VERCEL_PROJECT_ID) {
-    let deploymentTarget = target;
-    let deployment = await latestServiceDeployment(projectId, deploymentTarget);
-    if (!deployment && deploymentTarget === 'preview') {
-      // Every service is deployed from main at least once; branches reuse it until they change it.
-      core.info(`No READY preview deployment for ${branch}; reusing production.`);
-      deploymentTarget = 'production';
-      deployment = await latestServiceDeployment(projectId, deploymentTarget);
-    }
-    if (!deployment) throw new Error(`No READY deployment for ${projectId}; deploy it from main.`);
-    const hostname = serviceAlias(deployment.name, branch, deploymentTarget);
+    const deployment = await latestServiceDeployment(projectId, target);
+    if (!deployment) return null;
+    const hostname = serviceAlias(deployment.name, branch, target);
     const alias = await ownedServiceAlias(hostname, projectId);
     return {
       id: deployment.uid,
       url: `https://${alias?.deploymentId === deployment.uid ? hostname : deployment.url}`,
     };
+  }
+
+  // Redeploys production as this branch's preview with only its environment changed: no build or
+  // file transfer. Every service is deployed from main at least once.
+  async function cloneServiceDeploymentFor(runtime) {
+    const production = await latestServiceDeployment(env.VERCEL_PROJECT_ID, 'production');
+    if (!production)
+      throw new Error('No READY production deployment to clone; deploy it from main.');
+    core.info(`Cloning production deployment ${production.uid} for ${branch}.`);
+    const response = await fetch(
+      `https://api.vercel.com/v13/deployments?teamId=${env.VERCEL_ORG_ID}`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${env.VERCEL_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        // `env` is the undocumented field `vercel deploy --env` sends; omitting `target` makes the
+        // redeployment a preview, as `vercel redeploy --environment preview` does.
+        body: JSON.stringify({
+          deploymentId: production.uid,
+          name: production.name,
+          project: env.VERCEL_PROJECT_ID,
+          env: runtime,
+          meta: { githubDeployment: '1', githubCommitRef: branch, githubCommitSha: env.GITHUB_SHA },
+        }),
+      },
+    );
+    let deployment = await response.json();
+    if (!response.ok)
+      throw new Error(
+        `Vercel redeploy failed (HTTP ${response.status}): ${deployment.error?.message}`,
+      );
+    for (
+      let attempt = 0;
+      !['READY', 'ERROR', 'CANCELED'].includes(deployment.readyState);
+      attempt++
+    ) {
+      if (attempt === 200) throw new Error(`Clone ${deployment.id} did not finish in 10 minutes.`);
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      deployment = await vercelRequest(sdk.deploymentsGetDeployment, { idOrUrl: deployment.id });
+    }
+    if (deployment.readyState !== 'READY')
+      throw new Error(`Clone ${deployment.id} ended ${deployment.readyState}.`);
+    return assignServiceDeploymentFor(`https://${deployment.url}`);
   }
 
   async function getBackendServiceRuntime() {
@@ -151,8 +189,10 @@ function createProviders({ core, env = process.env }) {
   }
 
   async function getFrontendServiceRuntime() {
+    const backend = await getServiceDeploymentFor(env.VERCEL_BACKEND_PROJECT_ID);
+    if (!backend) throw new Error('Run the backend workflow first to deploy its preview.');
     return {
-      BACKEND_URL: (await getServiceDeploymentFor(env.VERCEL_BACKEND_PROJECT_ID)).url,
+      BACKEND_URL: backend.url,
       FRONTEND_URL: `https://${await serviceHostname(env.VERCEL_FRONTEND_PROJECT_ID)}`,
     };
   }
@@ -172,6 +212,7 @@ function createProviders({ core, env = process.env }) {
     getDatabasePreviewFor,
     getDatabaseConnectionFor,
     getServiceDeploymentFor,
+    cloneServiceDeploymentFor,
     getBackendServiceRuntime,
     getFrontendServiceRuntime,
     assignServiceDeploymentFor,

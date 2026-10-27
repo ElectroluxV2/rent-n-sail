@@ -29,16 +29,4 @@ async function packageFrontend(dist, output) {
   );
 }
 
-async function bindRuntime(directory, runtime) {
-  for (const name of await fs.readdir(directory)) {
-    const filename = path.join(directory, name);
-    if ((await fs.stat(filename)).isDirectory()) await bindRuntime(filename, runtime);
-    else if (name === '.vc-config.json') {
-      const config = JSON.parse(await fs.readFile(filename, 'utf8'));
-      config.environment = { ...config.environment, ...runtime };
-      await fs.writeFile(filename, JSON.stringify(config));
-    }
-  }
-}
-
-module.exports = { packageFrontend, bindRuntime };
+module.exports = { packageFrontend };

@@ -1,5 +1,15 @@
 # AI usage docs
 
+## 2026-10-27 — Settings only in deployment env; production clones for new branches
+
+- AI assistance: OpenCode (Claude Opus 5.5) replaced the reuse-production fallback, which the user rejected.
+  - **Settings:** they are no longer written into `.vc-config.json` (`bindRuntime` removed); publication passes them only as deployment environment variables.
+  - **Clones:** when an unchanged application has no preview for the branch, the reuse step redeploys the latest READY production deployment as the branch's preview with the branch's settings (`cloneServiceDeploymentFor`). There is no build, download, or upload.
+  - **Redeploy request:** it omits `target`, as `vercel redeploy --environment preview` does. It sends the undocumented `env` field that `vercel deploy --env` uses, because Vercel's public schema (`additionalProperties: false`) has no environment override.
+  - **Production today:** it still runs main's earlier code (backend only at `/api/*`, frontend alias 404), so clones work only once this pipeline has deployed both services from main.
+  - Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- Validation: with an injected fake SDK, an existing preview was reused. A missing preview produced one redeploy request (`deploymentId`, no `target`, the four backend settings, and branch metadata), was polled to READY, and received the branch alias. A frontend without a backend preview asked for the backend workflow first.
+
 ## 2026-10-27 — Review round: one provider module, change-only builds
 
 - AI assistance: OpenCode (Claude Opus 5.5) implemented the user's latest PR review comments.

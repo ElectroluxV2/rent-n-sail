@@ -7,7 +7,7 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: 🔗 Resolve existing deployment
+    - name: 🔗 Reuse or clone deployment
       id: existing
       if: env.BUILD_REQUESTED != 'true'
       uses: actions/github-script@v9.0.0

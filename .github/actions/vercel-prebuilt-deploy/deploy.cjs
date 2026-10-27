@@ -1,5 +1,5 @@
 const { createProviders } = require('../_shared/providers.cjs');
-const { packageFrontend, bindRuntime } = require('./output.cjs');
+const { packageFrontend } = require('./output.cjs');
 
 async function report({ core, env }, mode, { id, url }) {
   core.info(`${env.COMPONENT}: ${mode} deployment ${id} at ${url}.`);
@@ -20,8 +20,17 @@ async function vercel({ exec, env }, args, bindings = env) {
   return stdout.trim();
 }
 
+async function runtimeFor({ env, providers }) {
+  return env.COMPONENT === 'frontend'
+    ? providers.getFrontendServiceRuntime()
+    : providers.getBackendServiceRuntime();
+}
+
 async function reuse(context) {
-  await report(context, 'reuse', await context.providers.getServiceDeploymentFor());
+  const existing = await context.providers.getServiceDeploymentFor();
+  if (existing) return report(context, 'reuse', existing);
+  const clone = await context.providers.cloneServiceDeploymentFor(await runtimeFor(context));
+  await report(context, 'clone', clone);
 }
 
 async function pull(context) {
@@ -41,11 +50,8 @@ async function build(context) {
 
 async function publish(context) {
   const { env, providers } = context;
-  const runtime =
-    env.COMPONENT === 'frontend'
-      ? await providers.getFrontendServiceRuntime()
-      : await providers.getBackendServiceRuntime();
-  await bindRuntime('.vercel/output/functions', runtime);
+  // Settings stay out of the build output, so a redeploy can change them without a rebuild.
+  const runtime = await runtimeFor(context);
   const args = [
     'deploy',
     '--prebuilt',
