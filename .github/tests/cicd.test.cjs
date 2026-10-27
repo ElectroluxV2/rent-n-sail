@@ -280,6 +280,8 @@ for (const target of ['preview', 'production'])
     assert.deepEqual(runtime, {
       CORS_ALLOWED_ORIGINS: `https://${frontendHost}`,
       DATABASE_URL: 'postgresql://private',
+      WEBAUTHN_ORIGIN: `https://${frontendHost}`,
+      WEBAUTHN_RP_ID: frontendHost,
     });
     assert.ok(context.core.secrets.includes(runtime.DATABASE_URL));
     assert.deepEqual(context.core.outputs, {});

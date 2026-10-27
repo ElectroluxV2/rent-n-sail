@@ -203,6 +203,9 @@ function createProviders({ core, env = process.env, clients = {} }) {
     return {
       CORS_ALLOWED_ORIGINS: `https://${hostname}`,
       DATABASE_URL: await getDatabaseConnectionFor({ branchId, pooled: true }),
+      // Passkey ceremonies run on the frontend origin that calls this backend.
+      WEBAUTHN_ORIGIN: `https://${hostname}`,
+      WEBAUTHN_RP_ID: hostname,
     };
   }
 

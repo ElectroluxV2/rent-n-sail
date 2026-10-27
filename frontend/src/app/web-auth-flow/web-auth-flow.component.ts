@@ -150,18 +150,24 @@ export class WebAuthFlowComponent {
   }
 
   private sendFlow(path: string, payload: Record<string, unknown>): Promise<PasskeyFlowResponse> {
-    return firstValueFrom(this.http.post<PasskeyFlowResponse>(this.endpoint(path), payload));
+    return firstValueFrom(
+      this.http.post<PasskeyFlowResponse>(this.endpoint(path), payload, { withCredentials: true }),
+    );
   }
 
   private loginInit(): Promise<PasskeyOptionsResponse> {
     return firstValueFrom(
-      this.http.get<PasskeyOptionsResponse>(this.endpoint('login/passkey/begin')),
+      this.http.get<PasskeyOptionsResponse>(this.endpoint('login/passkey/begin'), {
+        withCredentials: true,
+      }),
     );
   }
 
   private registerInit(payload: Record<string, unknown>): Promise<PasskeyOptionsResponse> {
     return firstValueFrom(
-      this.http.post<PasskeyOptionsResponse>(this.endpoint('register/passkey/begin'), payload),
+      this.http.post<PasskeyOptionsResponse>(this.endpoint('register/passkey/begin'), payload, {
+        withCredentials: true,
+      }),
     );
   }
 

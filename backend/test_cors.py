@@ -33,7 +33,9 @@ class CorsTests(unittest.TestCase):
                     response.headers["access-control-allow-origin"], origin
                 )
                 self.assertIn("Origin", response.headers["vary"])
-                self.assertNotIn("access-control-allow-credentials", response.headers)
+                self.assertEqual(
+                    response.headers["access-control-allow-credentials"], "true"
+                )
 
     def test_origins_not_configured_in_environment_are_not_allowed(self):
         for origin in (

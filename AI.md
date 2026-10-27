@@ -1,5 +1,11 @@
 # AI usage docs
 
+## 2026-10-27 — Cross-origin passkey requests with AuthTuna on SQLite
+
+- AI assistance: OpenCode (Claude Opus 5.5) implemented the user's choice of credentialed CORS for the passkey flow while keeping AuthTuna on SQLite. The backend allows GET and POST with credentials for the configured frontend origin. AuthTuna's cookies are `SameSite=None; Secure`, including Starlette's session cookie that carries WebAuthn challenges; that middleware is now added directly, because `authtuna.init_app` hard-codes `SameSite=Lax`. Publication binds `WEBAUTHN_ORIGIN` and `WEBAUTHN_RP_ID` to the stable frontend origin, and the local defaults follow the Portless frontend. The SQLite file falls back to the temporary directory when the code directory is read-only, as on Vercel. The passkey component sends `withCredentials`. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- Validation: Ruff, the 9 backend tests (the CORS test now expects credentials), the frontend's ESLint, oxfmt, 5 tests, and production build, and the 33 CI tooling tests pass. A local HTTPS TestClient run confirmed the credentialed preflight, `SameSite=None; Secure` cookies, the frontend relying-party ID, a session round trip between two begin requests, and rejection of other origins.
+- Limitations: browsers that block third-party cookies (Safari by default) cannot complete the flow. SQLite on Vercel is per instance and wiped on cold starts. `FERNET_KEYS` and the session-signing key (`ENCRYPTION_PRIMARY_KEY`) still use development defaults, so deployments need real secrets before real users.
+
 ## 2026-10-27 — Stack timing after merging main; `/boats` fix
 
 - AI assistance: OpenCode (Claude Opus 5.5) ran `stack.yml` through PR #14 after merging main. Run `40520812604` passed in 4m18s: database 22s, backend 180s, and frontend 46s, with about 3s between jobs. The backend's publish took 150s because Vercel installed the new AuthTuna dependencies from scratch. A follow-up backend build (`40521689277`) published in 23.7s, and its job took 52s. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
