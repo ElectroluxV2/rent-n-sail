@@ -3,10 +3,18 @@ name = "backend"
 version = "0.1.0"
 requires-python = "==3.14.*"
 dependencies = [
+    "authtuna>=0.2.4",
     "fastapi[standard]>=0.162.0",
+    "greenlet>=3.5.6",
     "psycopg[binary]>=3.2.0",
+    "pydantic>=2.14.1",
+    "scalar-fastapi>=1.9.1",
     "sqlalchemy>=2.0.33",
+    "uvicorn>=0.54.0",
 ]
+
+[tool.fastapi]
+entrypoint = "main:app"
 
 [dependency-groups]
 dev = [

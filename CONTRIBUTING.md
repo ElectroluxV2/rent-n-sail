@@ -21,6 +21,8 @@ Use `https://frontend.localhost` and `https://backend.localhost`. The first inte
 
 To exercise the sample inventory, set `DATABASE_URL` in your process environment to a direct Neon development/preview connection, apply the [database migrations](database/README.md), then request `/boats` on the backend origin. The backend serves `/` and `/health` directly too; there is no `/api` prefix. Production deployments resolve pooled credentials separately. Never commit connection strings.
 
+AuthTuna stores local user and passkey data in `backend/authtuna_dev.db`.
+
 ## Formatting
 
 Run the formatter from `frontend` with `pnpm format`.

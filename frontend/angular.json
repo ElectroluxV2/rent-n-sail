@@ -93,7 +93,9 @@
               "buildTarget": "frontend:build:production"
             },
             "development": {
-              "buildTarget": "frontend:build:development"
+              "buildTarget": "frontend:build:development",
+              "proxyConfig": "proxy.conf.json",
+              "port": 4200
             }
           },
           "defaultConfiguration": "development"
