@@ -15,6 +15,11 @@
   - a backend update without a preview, which skips the fork;
   - a frontend update that packages and releases;
   - a frontend without a backend preview, and a production without a deployment, which both fail with the unified summary.
+- Live validation: signed, GitHub-Verified commit `881377c` passed three runs.
+  - **Stack run `40549800916` (43 s):** the `database/README.md` change updated the database: direct settings, `alembic upgrade head`, and a schema diff against the preview's parent, with result `update`. Both applications reused their previews (`reuse`).
+  - **Manual runs `40549834445` (backend, 45 s) and `40549854170` (frontend, 44 s), with `update=true`:** each found the existing preview, ran the full update, and released a new version at the same alias.
+  - **Previews:** afterwards, SSR rendered through `BACKEND_URL`, `/boats` read `DATABASE_URL`, and CORS and the passkey preflight allowed exactly the frontend origin with credentials.
+- Follow-up: the logs showed that GitHub displays composite sub-step names, so every operation appeared as "🌱 Run instance operation". The sub-step now takes its stage's name, for example 📝 Report instance, from the `operation` input.
 
 ## 2026-10-27 — Proposed unified component-workflow terminology
 

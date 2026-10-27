@@ -17,7 +17,8 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: 🌱 Run instance operation
+    # GitHub displays this name under the calling step, so it repeats that stage's name.
+    - name: ${{ fromJSON('{"ensure":"🌱 Ensure instance","pull":"📥 Pull project configuration","package":"🔨 Package version","settings":"🔐 Resolve settings","release":"🚀 Release update","report":"📝 Report instance"}')[inputs.operation] }}
       id: operation
       uses: actions/github-script@v9.0.0
       env:

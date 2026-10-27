@@ -91,6 +91,7 @@ Every reusable workflow runs the same stages in the same order. A single-step st
 | 12  | 📝 Report instance                | every run                | same                                      | same                                                                                     | same                                                                                       |
 
 - Settings are resolved after packaging, so they never reach build output.
+- `component-instance` names its own step after the calling stage, because GitHub displays composite sub-steps.
 - ⚙️ Set up Vercel CLI runs in stage 8, after the quality gates, because its `pnpm/setup` exports its own `PNPM_HOME` and puts it first on `PATH`.
 - The report logs `<component> <target> for <git-branch>: <result> <instance_id> at <address>`, sets the outputs, and writes the job summary below. A failed `component-instance` operation writes the same heading with `Result: ❌ <operation> failed` and the error.
 
