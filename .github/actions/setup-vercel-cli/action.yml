@@ -17,4 +17,4 @@ runs:
     - name: ⚙️ Add Vercel CLI to PATH
       shell: bash
       # language=bash
-      run: echo "$GITHUB_ACTION_PATH/node_modules/.bin" >> "$GITHUB_PATH"
+      run: pnpm --dir "$GITHUB_ACTION_PATH" bin >> "$GITHUB_PATH"

@@ -47,7 +47,7 @@ jobs:
       - name: 🧭 Select build path
         uses: actions/github-script@v9.0.0
         env:
-          BUILD: ${{ inputs.build || steps.changes.outputs.changed == 'true' || github.event.action == 'opened' || github.event.action == 'reopened' }}
+          BUILD: ${{ inputs.build || steps.changes.outputs.changed == 'true' }}
         with:
           # language=javascript
           script: |
@@ -66,39 +66,25 @@ jobs:
           working-directory: frontend
           cache: true
       - name: 🧹 Lint
-        id: lint
-        if: env.BUILD_REQUESTED == 'true'
-        continue-on-error: true
+        if: ${{ !cancelled() && env.BUILD_REQUESTED == 'true' }}
         working-directory: frontend
         # language=bash
         run: pnpm exec eslint . --format gha
       - name: 🎨 Check formatting
-        id: format
-        if: env.BUILD_REQUESTED == 'true'
-        continue-on-error: true
+        if: ${{ !cancelled() && env.BUILD_REQUESTED == 'true' }}
         uses: oxc-project/oxfmt-action@v0.0.1
         with:
           working-directory: frontend
       - name: 🧪 Run tests
-        id: tests
-        if: env.BUILD_REQUESTED == 'true'
-        continue-on-error: true
+        if: ${{ !cancelled() && env.BUILD_REQUESTED == 'true' }}
         working-directory: frontend
         # language=bash
         run: pnpm exec ng test --watch=false --reporters=default --reporters=github-actions
       - name: 🔨 Build application
-        id: build
-        if: env.BUILD_REQUESTED == 'true'
-        continue-on-error: true
+        if: ${{ !cancelled() && env.BUILD_REQUESTED == 'true' }}
         working-directory: frontend
         # language=bash
         run: pnpm exec ng build
-      - name: ❌ Report validation failure
-        if: contains(steps.*.outcome, 'failure')
-        uses: actions/github-script@v9.0.0
-        with:
-          # language=javascript
-          script: core.setFailed('Frontend validation failed.');
       - name: 🚀 Ensure deployment
         id: deploy
         uses: $/.github/actions/vercel-prebuilt-deploy

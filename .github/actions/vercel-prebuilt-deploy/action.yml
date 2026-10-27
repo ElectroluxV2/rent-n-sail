@@ -21,11 +21,6 @@ runs:
     - name: ⚙️ Set up Vercel CLI
       if: env.BUILD_REQUESTED == 'true'
       uses: $/.github/actions/setup-vercel-cli
-      env:
-        # Security: dependency installation must not receive deployment credentials.
-        VERCEL_TOKEN: ""
-        NEON_API_KEY: ""
-        GITHUB_TOKEN: ""
     - name: 📥 Pull project settings
       if: env.BUILD_REQUESTED == 'true'
       uses: actions/github-script@v9.0.0
@@ -57,10 +52,3 @@ runs:
         # language=javascript
         script: |
           await require(process.env.CI_SCRIPT)({ core, exec });
-    - name: ❌ Report deployment failure
-      if: failure()
-      uses: actions/github-script@v9.0.0
-      with:
-        # language=javascript
-        script: |
-          await core.summary.addHeading('Deployment failed').addRaw('See workflow annotations and sanitized logs.', true).write();

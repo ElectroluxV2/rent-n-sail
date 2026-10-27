@@ -39,13 +39,10 @@ jobs:
       DEPLOY_TARGET: ${{ case(inputs.target != '', inputs.target, github.event_name == 'push', 'production', 'preview') }}
       NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID || secrets.NEON_PROJECT_ID }}
       NEON_PARENT_BRANCH_ID: ${{ vars.NEON_PARENT_BRANCH_ID }}
-      NEON_DATABASE_NAME: ${{ vars.NEON_DATABASE_NAME || 'neondb' }}
-      NEON_ROLE_NAME: ${{ vars.NEON_ROLE_NAME || 'neondb_owner' }}
       VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
       VERCEL_BACKEND_PROJECT_ID: ${{ vars.VERCEL_BACKEND_PROJECT_ID }}
       VERCEL_FRONTEND_PROJECT_ID: ${{ vars.VERCEL_FRONTEND_PROJECT_ID }}
       VERCEL_PROJECT_ID: ${{ vars.VERCEL_BACKEND_PROJECT_ID }}
-      UV_PYTHON_PREFERENCE: only-managed
     steps:
       - name: 🔍 Check backend changes
         id: changes
@@ -55,7 +52,7 @@ jobs:
       - name: 🧭 Select build path
         uses: actions/github-script@v9.0.0
         env:
-          BUILD: ${{ inputs.build || steps.changes.outputs.changed == 'true' || github.event.action == 'opened' || github.event.action == 'reopened' }}
+          BUILD: ${{ inputs.build || steps.changes.outputs.changed == 'true' }}
         with:
           # language=javascript
           script: |
@@ -70,6 +67,9 @@ jobs:
       - name: ⚙️ Set up uv and Python
         uses: astral-sh/setup-uv@v10.3.2
         if: env.BUILD_REQUESTED == 'true'
+        env:
+          # The project venv gets a managed Python 3.14; later uv commands reuse that venv.
+          UV_PYTHON_PREFERENCE: only-managed
         with:
           working-directory: backend
           enable-cache: true
@@ -80,31 +80,19 @@ jobs:
         # language=bash
         run: uv sync --directory backend --locked
       - name: 🧹 Lint
-        id: lint
-        if: env.BUILD_REQUESTED == 'true'
-        continue-on-error: true
+        if: ${{ !cancelled() && env.BUILD_REQUESTED == 'true' }}
         # language=bash
         run: uv run --directory backend --locked ruff check --output-format=github
       - name: 🎨 Check formatting
-        id: format
-        if: env.BUILD_REQUESTED == 'true'
-        continue-on-error: true
+        if: ${{ !cancelled() && env.BUILD_REQUESTED == 'true' }}
         # language=bash
         run: uv run --directory backend --locked ruff format --check --output-format=github
       - name: 🧪 Run tests
-        id: tests
-        if: env.BUILD_REQUESTED == 'true'
-        continue-on-error: true
+        if: ${{ !cancelled() && env.BUILD_REQUESTED == 'true' }}
         env:
           PYTEST_RUN_PATH: backend
         # language=bash
         run: uv run --directory backend --locked pytest -q
-      - name: ❌ Report validation failure
-        if: contains(steps.*.outcome, 'failure')
-        uses: actions/github-script@v9.0.0
-        with:
-          # language=javascript
-          script: core.setFailed('Backend validation failed.');
       - name: 🚀 Ensure deployment
         id: deploy
         uses: $/.github/actions/vercel-prebuilt-deploy

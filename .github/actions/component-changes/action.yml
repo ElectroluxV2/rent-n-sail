@@ -16,7 +16,10 @@ runs:
       shell: bash
       env:
         CHECK_PATH: ${{ inputs.path }}
-        BEFORE: ${{ github.event.before || github.sha }}
+        # push and pull_request synchronize events carry before/after. Opened/reopened pull requests
+        # have neither, so they compare the PR base with the merge commit (github.sha); manual runs
+        # compare the current commit with itself, which reports no changes.
+        BEFORE: ${{ github.event.before || github.event.pull_request.base.sha || github.sha }}
         AFTER: ${{ github.event.after || github.sha }}
         GH_TOKEN: ${{ github.token }}
       # language=bash

@@ -2,7 +2,7 @@
   "name": "rent-n-sail-provider-sdks",
   "private": true,
   "scripts": {
-    "build": "node build.mjs"
+    "build": "esbuild sdk.mjs --bundle --platform=node --target=node24 --format=cjs --minify --legal-comments=none --log-level=warning --outfile=dist/sdk.cjs '--banner:js=// Generated from pnpm-lock.yaml by `pnpm run build`; do not edit.'"
   },
   "dependencies": {
     "@neon/sdk": "7.5.0",

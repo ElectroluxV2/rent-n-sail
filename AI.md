@@ -1,5 +1,18 @@
 # AI usage docs
 
+## 2026-10-27 — Review round: one provider module, change-only builds
+
+- AI assistance: OpenCode (Claude Opus 5.5) implemented the user's latest PR review comments.
+  - **Shared module:** `commands.cjs` is gone, and `providers.cjs` is the single shared module. `neonRequest` and `vercelRequest` create their clients with `??=`, and `vercelRequest` unwraps Vercel results without an adapter. `nullIfNotFound` replaces `missing`, and Vercel helpers use service names: `getServiceDeploymentFor`, `getBackendServiceRuntime`, `getFrontendServiceRuntime`, and `assignServiceDeploymentFor`.
+  - **Dropped features:** environment filtering, redaction, error rewriting, credential blanking, and `.env` blanking. Fetched database URLs are still masked with `core.setSecret`.
+  - **Neon:** Neon selects the branch's only database and role, so `NEON_DATABASE_NAME`, `NEON_ROLE_NAME`, and the schema-diff `database` input are gone.
+  - **Deployment script:** `deploy.cjs` calls `exec.getExecOutput` directly and writes its own failure summary.
+  - **Change-only builds:** applications build, and the database migrates, only on detected changes or manual runs. Opened and reopened PRs compare their base with the merge commit, and an unchanged application without a branch preview reuses its production deployment.
+  - **Workflows:** quality steps use `!cancelled()` instead of `continue-on-error`. `pnpm bin` locates the Vercel CLI, and `UV_PYTHON_PREFERENCE` moved to the setup-uv steps.
+  - **Vendored SDKs:** they build with the esbuild CLI from `package.json`.
+  - Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- Validation: actionlint, ShellCheck, action-lock verification, and diff checks pass, and the esbuild CLI bundle body is identical to the previous build. With an injected fake SDK, a branch without a preview reused production's deployment and alias, and every Vercel request carried `teamId`. The real Neon SDK resolved the connection string through the branch's roles and databases and masked it. A failing `reuse` rethrew the SDK error and wrote the failure summary.
+
 ## 2026-10-27 — Dropped the vendored SDK license notices
 
 - AI assistance: OpenCode (Claude Opus 5.5) removed `.github/actions/_shared/vendor/dist/THIRD_PARTY_NOTICES.txt` at the user's request. `build.mjs` now only writes the bundle, without esbuild's metafile or the license-file scan, and `.github/CI.md` no longer mentions the notices. The rebuilt `dist/sdk.cjs` is byte-identical. Because the bundle is minified with `legalComments: 'none'`, the repository no longer includes the Apache-2.0/MIT license texts of the bundled `@neon/sdk`, `@vercel/sdk`, and `zod`. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
