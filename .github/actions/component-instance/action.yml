@@ -1,6 +1,6 @@
 name: Component instance
 description: >-
-  Run one stage of the generic component flow (.github/COMPONENT-WORKFLOW.md) for the job's COMPONENT
+  Run one stage of the generic component flow for the job's COMPONENT
   (database, backend, or frontend), DEPLOY_TARGET (preview or production), and DEPLOY_BRANCH. The stage calls
   generic helpers that each component maps to its provider: Neon "Database" helpers for the database and Vercel
   "Service" helpers for the backend and frontend. State reaches later steps through INSTANCE_* job variables,

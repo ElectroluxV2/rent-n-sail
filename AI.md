@@ -1,5 +1,19 @@
 # AI usage docs
 
+## 2026-10-27 — Review: stable aliases, committed Vercel config, docs, and cookie revert
+
+- AI assistance: OpenCode (Claude Opus 5.5) implemented ten PR #14 review threads. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+  - **Stable aliases:** `findServiceDeployment` always reports a service's alias, never a deployment's own URL. Components therefore reference each other only through aliases derived from the Vercel project name and the Git branch, which stay fixed for a PR's lifetime.
+  - **Vercel config in the repository:** the frontend's Build Output configuration is committed in `frontend/vercel-output`: `config.json` with the routes, and the SSR function's `.vc-config.json` (Node 24). Packaging only copies it and the Angular build. Vercel's Node presets would compile `src/server.ts` from source, which works only after Angular's build.
+  - **Workflows:** `NEON_PROJECT_ID` comes only from the repository secret, the only one configured. `UV_PYTHON_PREFERENCE` links to uv's documentation, and `stack.yml` shares its target expression through a YAML anchor.
+  - **Docs:** deleted `.github/CI.md` and `.github/COMPONENT-WORKFLOW.md`. Also removed the CI/CD explanations this PR had added to `README.md`, `frontend/README.md`, `database/README.md`, and `CONTRIBUTING.md`.
+  - **Cookies:** reverted to main's AuthTuna setup: `init_app(app)`, with `SESSION_SECURE=False` and AuthTuna's default SameSite=Lax.
+- Validation: these checks passed:
+  - actionlint, including the anchor, and oxfmt;
+  - the ten-scenario check, now with an alias that points at an older deployment and with the committed config;
+  - backend ruff and its 9 tests;
+  - a local passkey begin, which set `session=…; samesite=lax`.
+
 ## 2026-10-27 — Removed old environments, deployments, and runs
 
 - AI assistance: OpenCode (Claude Opus 5.5) cleaned up the repository with the user's approval. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).

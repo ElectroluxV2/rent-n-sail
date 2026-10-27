@@ -1,0 +1,6 @@
+{
+  "runtime": "nodejs24.x",
+  "handler": "server/server.mjs",
+  "launcherType": "Nodejs",
+  "supportsResponseStreaming": true
+}

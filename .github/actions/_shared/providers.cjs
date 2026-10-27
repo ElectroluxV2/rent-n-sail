@@ -131,15 +131,14 @@ function createProviders({ core, exec, env = process.env }) {
     });
   }
 
+  // Components reference each other only through these aliases, which stay fixed for a Git branch's
+  // lifetime, never through a deployment's own URL.
   async function findServiceDeployment(projectId = env.VERCEL_PROJECT_ID) {
     const deployment = await latestServiceDeployment(projectId, target);
     if (!deployment) return null;
     const hostname = serviceAlias(deployment.name, branch, target);
-    const alias = await ownedServiceAlias(hostname, projectId);
-    return {
-      id: deployment.uid,
-      address: `https://${alias?.deploymentId === deployment.uid ? hostname : deployment.url}`,
-    };
+    await ownedServiceAlias(hostname, projectId);
+    return { id: deployment.uid, address: `https://${hostname}` };
   }
 
   async function pointServiceAlias(url) {
@@ -243,33 +242,17 @@ function createProviders({ core, exec, env = process.env }) {
   }
 
   // Vercel's Angular preset deploys only static browser output, but the runtime BACKEND_URL reaches
-  // the browser through SSR. The quality gates already compiled Angular, so this only lays out its
-  // SSR function, browser assets, and routes: https://vercel.com/docs/build-output-api
+  // the browser through SSR. frontend/vercel-output holds the Build Output configuration; this adds
+  // the already validated Angular build: https://vercel.com/docs/build-output-api
   async function packageFrontendServiceOutput() {
     const dist = 'frontend/dist/frontend';
-    const fn = '.vercel/output/functions/ssr.func';
-    await fs.cp(dist, fn, { recursive: true });
+    await fs.cp('frontend/vercel-output', '.vercel/output', { recursive: true });
+    await fs.cp(dist, '.vercel/output/functions/ssr.func', { recursive: true });
     await fs.cp(path.join(dist, 'browser'), '.vercel/output/static', {
       recursive: true,
-      // The client-only index must not become Vercel's static homepage ahead of SSR.
+      // Vercel would serve the client-only index as the homepage instead of SSR.
       filter: (source) => path.basename(source) !== 'index.csr.html',
     });
-    await fs.writeFile(
-      path.join(fn, '.vc-config.json'),
-      JSON.stringify({
-        runtime: `nodejs${process.versions.node.split('.')[0]}.x`,
-        handler: 'server/server.mjs',
-        launcherType: 'Nodejs',
-        supportsResponseStreaming: true,
-      }),
-    );
-    await fs.writeFile(
-      '.vercel/output/config.json',
-      JSON.stringify({
-        version: 3,
-        routes: [{ handle: 'filesystem' }, { src: '/(.*)', dest: '/ssr' }],
-      }),
-    );
     core.info('Packaged the validated Angular SSR build; no second build.');
   }
 

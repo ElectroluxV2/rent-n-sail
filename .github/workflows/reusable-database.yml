@@ -37,7 +37,7 @@ jobs:
       COMPONENT: database
       DEPLOY_BRANCH: ${{ github.head_ref || github.ref_name }}
       DEPLOY_TARGET: ${{ inputs.target }}
-      NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID || secrets.NEON_PROJECT_ID }}
+      NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
       NEON_PARENT_BRANCH_ID: ${{ vars.NEON_PARENT_BRANCH_ID }}
     steps:
       - name: 🔍 Detect changes
@@ -61,6 +61,7 @@ jobs:
         if: env.BUILD_NEEDED == 'true'
         env:
           # The project venv gets a managed Python 3.14; later uv commands reuse that venv.
+          # https://docs.astral.sh/uv/reference/environment/#uv_python_preference
           UV_PYTHON_PREFERENCE: only-managed
         with:
           working-directory: database
