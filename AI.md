@@ -3,6 +3,7 @@
 ## 2026-10-27 — Trimmed pnpm Vercel CLI without a cache
 
 - AI assistance: OpenCode (Claude Opus 5.5) measured the user's simpler alternative to the cached npm setup. `setup-vercel-cli` uses pnpm again, without a dependency cache. It has no `devEngines.runtime` (the CLI runs on the runner's Node.js) and sets `optional: false`, `allowBuilds: esbuild: false`, and `trustLockfile: true`. The regenerated lockfile has no Node runtime entry. A local frozen install added 270 packages, none of them optional platform binaries; it ran no install scripts and skipped lockfile verification, and `vercel --version` reported 65.2.0. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- Validation: signed, GitHub-Verified commit `67e191d` passed backend build `40516691912`, frontend build `40516709022`, and backend build `40516727360`. CLI setup took 1.94–2.29s on every run (0.83–1.01s to download pnpm, 0.88–1.2s to install). That compares with 1.36–1.82s for cached npm hits, 8.0s plus a 2.6s save for npm misses, and 4.1–6.4s before trimming. It met the user's ~2s threshold, so the simpler pnpm setup without cache steps is kept. The backend CLI ran on the runner's Node.js 24.21.0 and the frontend CLI on the frontend's locked 24.22.1. Live SSR, exact-origin CORS, and database-backed `/boats` checks passed.
 
 ## 2026-10-27 — Cached npm Vercel CLI on the runner's Node.js; trusted pnpm lockfiles
 
