@@ -6,34 +6,24 @@ import {
 } from '@angular/ssr/node';
 import express from 'express';
 import { join } from 'node:path';
+import { DEFAULT_FRONTEND_URL } from './local-origins';
 
 const browserDistFolder = join(import.meta.dirname, '../browser');
 
 const app = express();
 const portlessUrl = process.env['PORTLESS_URL'];
-const frontendUrl = process.env['FRONTEND_URL'];
+const frontendUrl = process.env['FRONTEND_URL'] ?? DEFAULT_FRONTEND_URL;
 // Vercel provides these deployment domains at runtime, without a URL scheme:
 // https://vercel.com/docs/environment-variables/system-environment-variables
 const allowedHosts = [
   process.env['VERCEL_URL'],
   process.env['VERCEL_BRANCH_URL'],
   process.env['VERCEL_PROJECT_PRODUCTION_URL'],
-  frontendUrl ? new URL(frontendUrl).hostname : undefined,
+  new URL(frontendUrl).hostname,
   // Portless supplies the local URL; Angular expects only its hostname.
   portlessUrl ? new URL(portlessUrl).hostname : undefined,
 ].filter((host): host is string => Boolean(host));
 const angularApp = new AngularNodeAppEngine({ allowedHosts });
-
-// Public runtime configuration also supports client-rendered entry paths.
-app.get('/runtime-config.json', (_req, res) => {
-  const backendUrl = process.env['BACKEND_URL'];
-  res.setHeader('Cache-Control', 'no-store');
-  if (!backendUrl) {
-    res.status(503).json({ error: 'Backend URL is not configured' });
-    return;
-  }
-  res.json({ backendUrl });
-});
 
 /**
  * Example Express Rest API endpoints can be defined here.

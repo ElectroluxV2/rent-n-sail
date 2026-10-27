@@ -9,16 +9,14 @@ runs:
   steps:
     - name: 🔗 Resolve deployment
       id: resolve
-      shell: bash
-      # language=bash
-      run: |
-        export STATE_FILE="$RUNNER_TEMP/rns-deployment.json"
-        export ARCHIVE_PATH="$RUNNER_TEMP/rns-artifact/build-output.tar.gz"
-        {
-          echo "STATE_FILE=$STATE_FILE"
-          echo "ARCHIVE_PATH=$ARCHIVE_PATH"
-        } >> "$GITHUB_ENV"
-        bash "$GITHUB_ACTION_PATH/deploy.sh" plan
+      uses: actions/github-script@v9.0.0
+      env:
+        DEPLOY_OPERATION: plan
+        CI_SCRIPT: ${{ github.action_path }}/deploy.cjs
+      with:
+        # language=javascript
+        script: |
+          await require(process.env.CI_SCRIPT)({ github, context, core, exec });
     - name: 📥 Checkout deployment configuration
       if: steps.resolve.outputs.mode != 'reuse' && env.RNS_SOURCE_READY != 'true'
       uses: actions/checkout@v7.0.1
@@ -38,26 +36,34 @@ runs:
         GITHUB_TOKEN: ""
     - name: 📥 Pull project settings
       if: steps.resolve.outputs.mode != 'reuse'
-      shell: bash
-      # language=bash
-      run: |
-        pull_args=(--yes --environment "$DEPLOY_TARGET")
-        if [[ "$DEPLOY_TARGET" == "preview" ]]; then
-          pull_args+=(--git-branch "$DEPLOY_BRANCH")
-        fi
-        vercel pull --local-config "$VERCEL_LOCAL_CONFIG" "${pull_args[@]}"
+      uses: actions/github-script@v9.0.0
+      env:
+        DEPLOY_OPERATION: pull
+        CI_SCRIPT: ${{ github.action_path }}/deploy.cjs
+      with:
+        # language=javascript
+        script: |
+          await require(process.env.CI_SCRIPT)({ github, context, core, exec });
     - name: 🔨 Build application
       if: steps.resolve.outputs.mode == 'build'
-      shell: bash
-      # language=bash
-      run: |
-        bash "$GITHUB_ACTION_PATH/deploy.sh" build-env
-        env -u NEON_API_KEY -u GITHUB_TOKEN vercel build --local-config "$VERCEL_LOCAL_CONFIG" --environment "$DEPLOY_TARGET"
+      uses: actions/github-script@v9.0.0
+      env:
+        DEPLOY_OPERATION: build
+        CI_SCRIPT: ${{ github.action_path }}/deploy.cjs
+      with:
+        # language=javascript
+        script: |
+          await require(process.env.CI_SCRIPT)({ github, context, core, exec });
     - name: 🗜️ Package build output
       if: steps.resolve.outputs.mode == 'build'
-      shell: bash
-      # language=bash
-      run: bash "$GITHUB_ACTION_PATH/deploy.sh" pack
+      uses: actions/github-script@v9.0.0
+      env:
+        DEPLOY_OPERATION: pack
+        CI_SCRIPT: ${{ github.action_path }}/deploy.cjs
+      with:
+        # language=javascript
+        script: |
+          await require(process.env.CI_SCRIPT)({ github, context, core, exec });
     - name: 📤 Upload build output
       id: artifact
       if: steps.resolve.outputs.mode == 'build'
@@ -70,28 +76,43 @@ runs:
         if-no-files-found: error
     - name: 📥 Download build output
       if: steps.resolve.outputs.mode == 'restore'
-      shell: bash
+      uses: actions/github-script@v9.0.0
       env:
+        DEPLOY_OPERATION: download
+        CI_SCRIPT: ${{ github.action_path }}/deploy.cjs
         GH_TOKEN: ${{ github.token }}
         SOURCE_RUN: ${{ steps.resolve.outputs.artifact_run_id }}
         SOURCE_ARTIFACT: ${{ steps.resolve.outputs.artifact_name }}
-      # language=bash
-      run: gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --name "$SOURCE_ARTIFACT" --dir "$RUNNER_TEMP/rns-artifact"
+      with:
+        # language=javascript
+        script: |
+          await require(process.env.CI_SCRIPT)({ github, context, core, exec });
     - name: 📥 Restore build output
       if: steps.resolve.outputs.mode == 'restore'
-      shell: bash
-      # language=bash
-      run: bash "$GITHUB_ACTION_PATH/deploy.sh" restore
+      uses: actions/github-script@v9.0.0
+      env:
+        DEPLOY_OPERATION: restore
+        CI_SCRIPT: ${{ github.action_path }}/deploy.cjs
+      with:
+        # language=javascript
+        script: |
+          await require(process.env.CI_SCRIPT)({ github, context, core, exec });
     - name: 🚀 Publish deployment
       id: publish
-      shell: bash
+      uses: actions/github-script@v9.0.0
       env:
+        DEPLOY_OPERATION: publish
+        CI_SCRIPT: ${{ github.action_path }}/deploy.cjs
         BUILD_ARTIFACT_ID: ${{ steps.artifact.outputs.artifact-id }}
         BUILD_ARTIFACT_NAME: rns-${{ env.COMPONENT }}-${{ github.run_id }}-${{ github.run_attempt }}
-      # language=bash
-      run: bash "$GITHUB_ACTION_PATH/deploy.sh" publish
+      with:
+        # language=javascript
+        script: |
+          await require(process.env.CI_SCRIPT)({ github, context, core, exec });
     - name: ❌ Report deployment failure
       if: failure()
-      shell: bash
-      # language=bash
-      run: echo "## Deployment failed — see the workflow annotations and sanitized logs." >> "$GITHUB_STEP_SUMMARY"
+      uses: actions/github-script@v9.0.0
+      with:
+        # language=javascript
+        script: |
+          await core.summary.addHeading('Deployment failed').addRaw('See workflow annotations and sanitized logs.', true).write();

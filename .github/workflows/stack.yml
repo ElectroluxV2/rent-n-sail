@@ -1,4 +1,4 @@
-name: 🚀 Automatic stack CI/CD
+name: 🚀 Stack CI/CD
 on:
   pull_request:
   push:

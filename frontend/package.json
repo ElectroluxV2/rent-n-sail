@@ -4,10 +4,9 @@
   "private": true,
   "scripts": {
     "ng": "ng",
-    "start": "node --env-file=../.env.local node_modules/portless/dist/cli.js frontend ng serve",
-    "start:backend": "node --env-file=../.env.local node_modules/portless/dist/cli.js backend uv run --directory ../backend fastapi dev",
+    "start": "portless frontend ng serve",
+    "start:backend": "portless backend uv run --directory ../backend fastapi dev",
     "build": "ng build",
-    "build:vercel": "node scripts/build-vercel.mjs",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "lint": "eslint .",

@@ -2,13 +2,13 @@
 
 ## Entry points
 
-`automatic.yml` contains exactly three ordered calls: database → backend → frontend. All CI/CD orchestration uses Bash, jq, Git, curl, and the provider CLIs; there is no Python controller.
+`stack.yml` contains exactly three ordered calls: database → backend → frontend. CI/CD orchestration is JavaScript executed by `actions/github-script@v9.0.0`; there are no Bash/Python controllers. JavaScript modules live beside their composite definitions and use the injected GitHub client, workflow context, Actions core, and exec toolkit. Native application build/test/migration commands remain normal tool invocations.
 
-Each reusable workflow calls `.github/actions/component-changes` once, with only `path: database/`, `backend/`, or `frontend/`. The action reads `before`/`after` from `$GITHUB_EVENT_PATH`, fetches the GitHub comparison JSON with the built-in token, and uses jq's `contains` to output `changed=true/false`. No Git command or checkout runs in the detector. The event supplies SHAs, not file lists; GitHub's API supplies the changed filenames, including previous names for renames. Logs show the searched substring, JSON-escaped changed paths with forced `jq -C` colors, and match result. Data used for matching/output remains uncolored. At GitHub's 300-file cap, the action logs the limit and returns `changed=true` for any requested path, since further matching files may have been truncated. Below the cap, actual paths decide the result. Missing SHAs, API errors, and non-forward comparisons still fail rather than silently meaning "unchanged".
+Each reusable workflow calls `.github/actions/component-changes` once, with only `path: database/`, `backend/`, or `frontend/`. The action reads `before`/`after` from the injected event context, fetches GitHub comparison metadata with its pre-authenticated client, and performs substring matching in JavaScript. No Git command or checkout runs in the detector. The event supplies SHAs, not file lists; GitHub's API supplies the changed filenames, including previous names for renames. Logs show the searched substring, JSON-escaped changed paths with forced `jq -C` colors, and match result. jq is used only to display colored JSON, not to orchestrate the workflow. Data used for matching/output remains uncolored. At GitHub's 300-file cap, the action logs the limit and returns `changed=true` for any requested path, since further matching files may have been truncated. Below the cap, actual paths decide the result. Missing SHAs, API errors, and non-forward comparisons still fail rather than silently meaning "unchanged".
 
 Callers invoke detection for pushes and PR `synchronize` events. Initial PR `opened`/`reopened` events explicitly run full application validation/builds; manual application runs use their existing build checkbox. These choices are outside the detector. Application build decisions use only the latest push, not the cumulative PR diff. Shared CI-only or documentation changes do not implicitly rebuild applications. Database change detection is informational: the database job always applies pending migrations.
 
-The selected frontend production build is compiled once during validation. Vercel packaging reuses that validated output in the same job; standalone `build:vercel` still runs Angular's build first.
+The frontend is compiled once during validation. The deployment action packages that existing SSR/browser output directly using Vercel's Build Output API. There is no separate frontend build controller or second Vercel frontend build; `frontend/vercel.json` disables Vercel's build command. Backend output still uses Vercel's Python builder.
 
 `database.yml`, `backend.yml`, and `frontend.yml` are manual-only entry points; each calls only its corresponding reusable workflow. Manual application runs default to a build. Backend credentials are read privately from the matching Neon branch; the frontend reads its matching READY backend deployment through Vercel. Missing dependencies fail with an instruction to run the relevant workflow; no reusable workflow invokes another application's CI/CD. The frontend receives no Neon secrets.
 
@@ -26,7 +26,7 @@ Every configured workflow/composite step has an explicit emoji-prefixed name. Th
 - 🧹 lint; 🎨 formatting; 🧪 tests; 🔨 builds.
 - 🚀 publication/migrations; 📝 reports; ❌ failures.
 
-Selection and resource-resolution steps log their decisions: full build/migration versus reuse, preview branch creation/reuse, selected production parent/database reference, and chosen deployment IDs/URLs. Private connection values and tokens are not printed. Scripts live beside their action definitions; shared provider helpers are in `.github/actions/_shared`. CI-script regression tests run locally with `bash .github/tests/cicd.sh`, not as an extra workflow step.
+Selection and resource-resolution steps log their decisions: full build/migration versus reuse, preview branch creation/reuse, selected production parent/database reference, and chosen deployment IDs/URLs. Private connection values and tokens are not printed. `.cjs` modules live beside their action definitions; shared provider/command helpers are in `.github/actions/_shared`. Actions expressions reach JavaScript through environment variables, never interpolated into executable code. Module calls do not return credential-bearing values to github-script's automatic result output. Package/build subprocesses do not receive github-script token inputs. Regression tests run locally with Node's built-in test runner, not as an extra workflow step.
 
 ## Repository setup
 
@@ -62,18 +62,17 @@ An existing production deployment created before this artifact contract has no r
 
 Each preview uses stable, project-and-branch-specific aliases. Before granting CORS access for a new backend publication, the frontend origin is reserved/ownership-checked; on first reservation the alias temporarily points at the existing production frontend until the preview is published. This is a provider hostname reservation, not a call to frontend CI or a frontend build/deployment. Reuse-only runs do not alter aliases. Wait for the entire stack run to be green before using it. Existing aliases are never taken from another project.
 
-The backend exposes `/`, `/health`, and `/boats` directly, without an `/api` prefix, and allows exactly the corresponding stable frontend origin. Open that stable URL from the GitHub Environment; an arbitrary deployment hostname is not implicitly trusted. The frontend receives the resolved backend URL as runtime configuration, not a compiled constant. SSR transfers its root URL to Angular; a client-rendered entry loads `/runtime-config.json` before bootstrap, fixing the missing-URL failure without a frontend rebuild when backend bindings change.
+The backend exposes `/`, `/health`, and `/boats` directly, without an `/api` prefix, and allows exactly the corresponding stable frontend origin. Open that stable URL from the GitHub Environment; an arbitrary deployment hostname is not implicitly trusted. The composable `provideBackendApiUrl` provider transfers the runtime backend URL from SSR to the browser. There is no runtime-config endpoint or preload request. Local development defaults to the explicit Portless backend/frontend origins without an environment file; deployment runtime bindings override those defaults.
 
 Backend preview URLs must be accessible to browser API calls. Vercel team-login protection cannot be solved by exposing an automation bypass secret to JavaScript. Configure the backend API's deployment protection deliberately; these workflows do not silently disable project security.
 
 Publication waits for Vercel's READY status, assigns the stable URL, and records deployment outputs/summaries. Post-deployment HTTP/CORS/SSR probes and runtime-log debugging have been removed; deployment success does not claim an end-to-end browser validation. Normal lint, formatting, application tests, build checks, artifact provenance checks, and credential-safety checks remain in place. Existing READY previews are reused without CLI setup, as required by the no-op reuse policy.
 
-Fork PRs do not receive repository secrets under the normal `pull_request` trigger and cannot deploy a credential-backed stack. There is no privileged `pull_request_target` checkout of fork code.
+Jobs have no fork-PR skip condition. Fork PRs still do not receive repository secrets under the normal `pull_request` trigger, so credential-backed operations fail with a missing-configuration error rather than publishing. There is no privileged `pull_request_target` checkout of fork code.
 
 ## Verification
 
 ```bash
-bash .github/tests/cicd.sh
-shellcheck .github/actions/*/*.sh .github/tests/*.sh
+node --test .github/tests/cicd.test.cjs
 uv run --directory backend --locked pytest -q
 ```

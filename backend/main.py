@@ -10,6 +10,7 @@ from database import get_session
 from models import Boat
 
 api_router = APIRouter()
+DEFAULT_FRONTEND_ORIGIN = "https://frontend.localhost"
 
 
 @api_router.get("/")
@@ -36,7 +37,9 @@ def create_app():
         CORSMiddleware,
         allow_origins=[
             origin.strip()
-            for origin in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",")
+            for origin in os.environ.get(
+                "CORS_ALLOWED_ORIGINS", DEFAULT_FRONTEND_ORIGIN
+            ).split(",")
             if origin.strip()
         ],
         allow_methods=["GET"],

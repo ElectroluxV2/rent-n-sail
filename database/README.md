@@ -22,4 +22,4 @@ Review generated migrations before committing them. Production migrations should
 
 The reusable database workflow prepares an isolated copy-on-write Neon preview, applies pending migrations on every run, and uses `neondatabase/schema-diff-action` to comment the schema difference against the production parent on the PR. See [repository setup](../.github/CI.md#repository-setup) for the token and project variables.
 
-Local tests use an isolated SQLite database to exercise upgrade, repeatability, seed data, and downgrade without requiring a Neon secret. The real preview workflow executes the same Alembic migration on Postgres; an offline Postgres SQL rendering can be checked with `uv run alembic upgrade head --sql` and a Postgres `DATABASE_URL`.
+The preview workflow executes Alembic migrations on Postgres on every run. An offline Postgres SQL rendering can be checked with `uv run alembic upgrade head --sql` and a Postgres `DATABASE_URL`.

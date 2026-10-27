@@ -23,14 +23,13 @@ permissions:
 jobs:
   database:
     name: Deployment
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-26.04
     concurrency:
-      group: database-${{ (inputs.target || (github.event_name == 'push' && 'production' || 'preview')) == 'production' && 'production' || (inputs.branch || github.head_ref || github.ref_name) }}
+      group: &environment database-${{ (inputs.target || (github.event_name == 'push' && 'production' || 'preview')) == 'production' && 'production' || (inputs.branch || github.head_ref || github.ref_name) }}
       cancel-in-progress: false
       queue: max
     environment:
-      name: database-${{ (inputs.target || (github.event_name == 'push' && 'production' || 'preview')) == 'production' && 'production' || (inputs.branch || github.head_ref || github.ref_name) }}
+      name: *environment
     outputs:
       branch_id: ${{ steps.reference.outputs.branch_id }}
     env:
@@ -65,12 +64,14 @@ jobs:
           operation: database-plan
       - name: 🧭 Select database reference
         id: reference
+        uses: actions/github-script@v9.0.0
         env:
           NEON_BRANCH_ID: ${{ env.DEPLOY_TARGET == 'preview' && steps.branch.outputs.branch_id || steps.plan.outputs.parent_branch_id }}
-        # language=bash
-        run: |
-          printf 'Selected %s database branch: %s\n' "$DEPLOY_TARGET" "$NEON_BRANCH_ID"
-          echo "branch_id=$NEON_BRANCH_ID" >> "$GITHUB_OUTPUT"
+        with:
+          # language=javascript
+          script: |
+            core.info(`Selected ${process.env.DEPLOY_TARGET} database branch: ${process.env.NEON_BRANCH_ID}`);
+            core.setOutput('branch_id', process.env.NEON_BRANCH_ID);
       - name: 📥 Checkout migration source
         uses: actions/checkout@v7.0.1
         with:
@@ -105,12 +106,10 @@ jobs:
           compare_branch: ${{ steps.reference.outputs.branch_id }}
           database: ${{ env.NEON_DATABASE_NAME }}
       - name: 📝 Write deployment summary
+        uses: actions/github-script@v9.0.0
         env:
           NEON_BRANCH_ID: ${{ steps.reference.outputs.branch_id }}
-        # language=bash
-        run: |
-          {
-            echo "## Database deployment"
-            echo "Neon branch: $NEON_BRANCH_ID"
-            echo "Migrations: Alembic upgrade head completed (pending revisions only)."
-          } >> "$GITHUB_STEP_SUMMARY"
+        with:
+          # language=javascript
+          script: |
+            await core.summary.addHeading('Database deployment').addRaw(`Neon branch: ${process.env.NEON_BRANCH_ID}\nMigrations: Alembic upgrade head completed (pending revisions only).`, true).write();

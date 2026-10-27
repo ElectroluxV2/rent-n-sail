@@ -3,26 +3,29 @@
 # Docs: https://gh.io/actions-lockfile
 version: 'v0.0.3'
 workflows:
-    '.github/workflows/automatic.yml': []
     '.github/workflows/backend.yml': []
     '.github/workflows/database.yml': []
     '.github/workflows/frontend.yml': []
     '.github/workflows/reusable-backend.yml':
         - 'actions/cache@v6.1.0'
         - 'actions/checkout@v7.0.1'
+        - 'actions/github-script@v9.0.0'
         - 'actions/upload-artifact@v7.0.2'
         - 'astral-sh/setup-uv@v10.3.2'
         - 'pnpm/setup@v3.1.1'
     '.github/workflows/reusable-database.yml':
         - 'actions/checkout@v7.0.1'
+        - 'actions/github-script@v9.0.0'
         - 'astral-sh/setup-uv@v10.3.2'
         - 'neondatabase/schema-diff-action@v1.0.1'
     '.github/workflows/reusable-frontend.yml':
         - 'actions/cache@v6.1.0'
         - 'actions/checkout@v7.0.1'
+        - 'actions/github-script@v9.0.0'
         - 'actions/upload-artifact@v7.0.2'
         - 'oxc-project/oxfmt-action@v0.0.1'
         - 'pnpm/setup@v3.1.1'
+    '.github/workflows/stack.yml': []
 dependencies:
     'actions/cache@v6.1.0':
         ref: 'v6.1.0'
@@ -34,6 +37,11 @@ dependencies:
         commit: 'sha1-3d3c42e5aac5ba805825da76410c181273ba90b1'
         owner_id: 44036562
         repo_id: 197814629
+    'actions/github-script@v9.0.0':
+        ref: 'v9.0.0'
+        commit: 'sha1-3a2844b7e9c422d3c10d287c895573f7108da1b3'
+        owner_id: 44036562
+        repo_id: 205262760
     'actions/upload-artifact@v7.0.2':
         ref: 'v7.0.2'
         commit: 'sha1-cf430e030ddbb5b0abf93d22962f4752f3646cd9'

@@ -13,9 +13,11 @@ runs:
   steps:
     - name: 🔍 Check changed path
       id: detect
-      shell: bash
+      uses: actions/github-script@v9.0.0
       env:
         CHECK_PATH: ${{ inputs.path }}
-        GH_TOKEN: ${{ github.token }}
-      # language=bash
-      run: bash "$GITHUB_ACTION_PATH/detect.sh" "$CHECK_PATH"
+        CI_SCRIPT: ${{ github.action_path }}/detect.cjs
+      with:
+        # language=javascript
+        script: |
+          await require(process.env.CI_SCRIPT)({ github, context, core, exec });

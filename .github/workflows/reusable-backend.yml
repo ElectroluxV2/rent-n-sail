@@ -28,14 +28,13 @@ permissions:
 jobs:
   backend:
     name: Deployment
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-26.04
     concurrency:
-      group: backend-${{ (inputs.target || (github.event_name == 'push' && 'production' || 'preview')) == 'production' && 'production' || (inputs.branch || github.head_ref || github.ref_name) }}
+      group: &environment backend-${{ (inputs.target || (github.event_name == 'push' && 'production' || 'preview')) == 'production' && 'production' || (inputs.branch || github.head_ref || github.ref_name) }}
       cancel-in-progress: false
       queue: max
     environment:
-      name: backend-${{ (inputs.target || (github.event_name == 'push' && 'production' || 'preview')) == 'production' && 'production' || (inputs.branch || github.head_ref || github.ref_name) }}
+      name: *environment
       url: ${{ steps.deploy.outputs.url }}
     outputs:
       url: ${{ steps.deploy.outputs.url }}
@@ -61,17 +60,16 @@ jobs:
           path: backend/
       - name: 🧭 Select build path
         id: selection
+        uses: actions/github-script@v9.0.0
         env:
           BUILD: ${{ inputs.build || steps.changes.outputs.changed == 'true' || github.event.action == 'opened' || github.event.action == 'reopened' }}
-        # language=bash
-        run: |
-          if [[ "$BUILD" == true ]]; then
-            echo "Build path: run validation and build the backend."
-          else
-            echo "Build path: reuse the preview, or restore production output if absent."
-          fi
-          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
-          echo "BUILD_REQUESTED=$BUILD" >> "$GITHUB_ENV"
+        with:
+          # language=javascript
+          script: |
+            const build = process.env.BUILD === 'true';
+            core.info(build ? 'Build path: run validation and build the backend.' : 'Build path: reuse the preview, or restore production output if absent.');
+            core.setOutput('build', build);
+            core.exportVariable('BUILD_REQUESTED', String(build));
       - name: 📥 Checkout source
         id: source
         if: steps.selection.outputs.build == 'true'
@@ -112,10 +110,10 @@ jobs:
         run: uv run --directory backend --locked pytest -q
       - name: ❌ Report validation failure
         if: contains(steps.*.outcome, 'failure')
-        # language=bash
-        run: |
-          echo "::error::Backend validation failed."
-          exit 1
+        uses: actions/github-script@v9.0.0
+        with:
+          # language=javascript
+          script: core.setFailed('Backend validation failed.');
       - name: 🚀 Ensure deployment
         id: deploy
         uses: $/.github/actions/vercel-prebuilt-deploy
@@ -123,4 +121,3 @@ jobs:
           RNS_SOURCE_READY: ${{ steps.source.outcome == 'success' }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          GITHUB_TOKEN: ${{ github.token }}

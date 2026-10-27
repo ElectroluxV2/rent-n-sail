@@ -1,17 +1,19 @@
 import { TestBed } from '@angular/core/testing';
-import { TransferState } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { App } from './app';
-import { BACKEND_API_URL_STATE_KEY } from './backend-api-url';
+import { provideBackendApiUrl } from './backend-api-url';
 
 describe('App', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [App],
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideBackendApiUrl('https://backend.test'),
+      ],
     }).compileComponents();
-    TestBed.inject(TransferState).set(BACKEND_API_URL_STATE_KEY, 'https://backend.test/');
   });
 
   afterEach(() => {

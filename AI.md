@@ -1,11 +1,26 @@
 # AI usage docs
 
+## 2026-10-27 — PR #14 review follow-up
+
+- AI assistance: OpenCode (GPT-6.1 Sol) implemented the latest review comments: removed reusable job skip conditions, shared concurrency/environment names with YAML anchors, renamed the caller to `stack.yml`, and removed the obsolete migration test and Bash CI test script. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- Removed the frontend build controller, its build-ready switch, and Vercel's automatic frontend build command. The colocated deployment action packages the existing validated Angular SSR/browser output without compiling it again or introducing an API discovery stub.
+- Replaced runtime-config fetching, preload initialization, and missing-SSR error handling with the composable `provideBackendApiUrl` provider and SSR TransferState. Added explicit default Portless origins, removed mandatory local environment-file setup, simplified Portless commands, and documented `pnpm env use --global 24`.
+- Preserved private deployment credentials, explicit CORS allowlists, retained compiled output, and checkout-free no-op preview reuse. No merge or rebase of newer `main` was performed.
+- Validation: 33 Node orchestration tests, 5 frontend tests, backend tests (8 tests and 9 subtests), application lint/format checks, Angular production build, actionlint (existing modern-syntax/runner-label exceptions), action-lock verification, and diff checks passed. An isolated packaged SSR check rendered a backend fixture and transferred its URL; its initial raw-HTML URL assertion was corrected to parse Angular's escaped TransferState JSON. The JavaScript restore implementation also restored the actual retained backend v2 artifact successfully.
+
+## 2026-10-27 — JavaScript orchestration through actions/github-script
+
+- AI assistance: OpenCode (GPT-6.1 Sol) rewrote Bash CI/CD orchestration as colocated CommonJS modules executed with `actions/github-script@v9.0.0` (Node 24), using injected GitHub/context/core/exec interfaces. Migrated change detection, Neon/Vercel discovery and publication, artifact sanitization/materialization/restoration, CLI setup, selection outputs, and summaries. Native application tool commands remain unchanged. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- Preserved the three-job caller, independent reusable workflows, checkout-free discovery/reuse, single-path detector, conservative 300-file policy, colored JSON, unconditional pending migrations, retained compiled-output protocol, step names, and credential isolation. No credential-bearing module result is returned to github-script outputs; action token inputs are stripped from application/package subprocesses.
+- Replaced local Bash tests with Node's built-in test runner. Did not merge/rebase `main` or resolve its unrelated passkey/unit-test conflicts as part of this rewrite.
+
 ## 2026-10-27 — Colocated CI scripts and conservative large-change detection
 
 - AI assistance: OpenCode (GPT-6.1 Sol) moved the Vercel deployment/artifact scripts beside their composite definition, gave the Neon composite its own colocated entry point, placed shared provider helpers in `.github/actions/_shared`, and moved local tests/docs under `.github`. Updated script invocations and documentation links. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
 - Changed the requested API-cap policy: when GitHub returns 300 files, the detector logs the cap and returns `changed=true` for the requested substring instead of failing. This is conservative for each of the three users of the shared action; below the cap actual path matches still decide. No checkout or Git dependency was added to detection, and displayed JSON remains colored.
 - Kept `Select database reference` unchanged as requested. Added regression coverage for below-cap versus capped comparisons and the relocated entry points.
 - Validation: 46 local Bash checks, ShellCheck, actionlint (with documented syntax/runner-label exceptions), action-lock verification, formatting, and diff checks passed before submission.
+- Pushed signed/Verified commit `8a0a71e`. Live PR validation is blocked by conflicts with newer `main` commits introducing the passkey flow (#13) and unit tests (#15). Fetched `main` and inspected conflicts with `git merge-tree` only; no merge/rebase or application conflict resolution has been started. Requested authorization before integrating those changes.
 
 ## 2026-10-27 — Database-reference step explanation
 

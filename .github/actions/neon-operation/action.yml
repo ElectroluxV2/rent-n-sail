@@ -16,8 +16,11 @@ runs:
   steps:
     - name: 🔗 Resolve Neon resource
       id: operation
-      shell: bash
+      uses: actions/github-script@v9.0.0
       env:
         NEON_OPERATION: ${{ inputs.operation }}
-      # language=bash
-      run: bash "$GITHUB_ACTION_PATH/neon.sh" "$NEON_OPERATION"
+        CI_SCRIPT: ${{ github.action_path }}/neon.cjs
+      with:
+        # language=javascript
+        script: |
+          await require(process.env.CI_SCRIPT)({ github, context, core });

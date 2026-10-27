@@ -6,25 +6,23 @@ This project was generated using [Angular CLI](https://github.com/angular/angula
 
 The frontend and backend use separate Vercel projects. Postgres is hosted by Neon and is accessed only by the backend, not by browsers.
 
-- `src/server.ts` defines and default-exports the SSR handler before Angular compiles it. `pnpm run build:vercel` packages that compiled handler and the browser assets using the [Vercel Build Output API](https://vercel.com/docs/build-output-api). Static assets are served first, and page requests go to the SSR function. There is no `api/` discovery stub or adapter.
-- The ordered deployment workflow supplies `BACKEND_URL` from the resolved backend deployment. SSR transfers its root `/` URL to Angular; a client-rendered entry loads `/runtime-config.json` before bootstrap when SSR state is absent. Both browser and SSR call the backend directly, without an `/api` prefix or backend proxy. The URL is public runtime configuration, not a baked-in build constant.
-- Backend CORS uses only the explicit `CORS_ALLOWED_ORIGINS` allowlist. The automated stack sets it to the verified stable frontend origin; independent/local deployments must configure it explicitly. There are no regex patterns or implicit trusted domains. The current API permits cross-origin `GET` requests without cookies.
+- `src/server.ts` defines and default-exports the SSR handler before Angular compiles it. The deployment action packages the already validated build using the [Vercel Build Output API](https://vercel.com/docs/build-output-api), without running Angular or Vercel's frontend build again. `vercel.json` disables the Vercel build command. Static assets are served first, and page requests go to the SSR function. There is no `api/` discovery stub or frontend packaging script.
+- The ordered deployment workflow supplies `BACKEND_URL` from the resolved backend deployment. The composable `provideBackendApiUrl` provider transfers its root `/` URL from SSR to Angular in the browser, without an initializer, config endpoint, or preload request. Both call the backend directly, without an `/api` prefix or backend proxy. The URL is public runtime configuration, not a baked-in deployment constant.
+- Backend CORS uses only the explicit `CORS_ALLOWED_ORIGINS` allowlist, defaulting locally to `https://frontend.localhost`. The automated stack overrides it with the verified stable frontend origin; independent deployments can set their own explicit list. There are no regex patterns. The current API permits cross-origin `GET` requests without cookies.
 - Open the stable frontend URL from the GitHub Environment, not an arbitrary deployment hostname. Vercel Authentication on the backend can redirect API calls before CORS runs; changing application CORS cannot authorize that redirect. The API must be reachable under the approved browser-access policy for SSR to obtain and transfer a successful HttpClient response.
 
 The [stack workflows](../.github/CI.md) prepare the Neon preview first, apply [Alembic migrations](../database/README.md), deploy/resolve the backend, then deploy/resolve the frontend. Neon’s official action comments schema changes on the PR. Database credentials are resolved privately in each consuming job; no database password is passed through job outputs or public frontend configuration.
 
-The remaining page rewrites only route frontend requests to Angular SSR.
-
 ## Development server
 
-Copy the root `.env.example` to `.env.local` once. After installing frontend dependencies, run these commands in separate terminals from `frontend`:
+After installing frontend dependencies, run these commands in separate terminals from `frontend`; no environment file is required:
 
 ```bash
 pnpm run start:backend
 pnpm start
 ```
 
-[Portless](https://github.com/vercel-labs/portless) exposes the backend at `https://backend.localhost` and the frontend at `https://frontend.localhost`. It assigns free application ports automatically; FastAPI reads the injected `PORT` variable natively. Both scripts load `.env.local` through Node's `--env-file` option and pass the application commands directly to Portless, without shell-specific environment assignments or port interpolation. Configure `BACKEND_URL` and the explicit `CORS_ALLOWED_ORIGINS` allowlist in that file; existing process environment variables take precedence.
+[Portless](https://github.com/vercel-labs/portless) exposes the backend at `https://backend.localhost` and the frontend at `https://frontend.localhost`. It assigns free application ports automatically; FastAPI reads the injected `PORT` variable natively. Scripts pass the application commands directly to Portless. Frontend origin defaults live in `src/local-origins.ts`; the backend's explicit local CORS default lives in `backend/main.py`.
 
 On first use, Portless may request permission to trust its local CA and bind HTTPS port 443. Run it interactively and follow its prompts. For custom proxy ports, TLS modes, hostnames, or worktrees, set `BACKEND_URL` to the backend's actual Portless URL and update `CORS_ALLOWED_ORIGINS` to the frontend's actual origin. No local CA or system trust changes are performed by repository setup or CI.
 

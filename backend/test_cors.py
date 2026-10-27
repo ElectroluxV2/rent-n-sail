@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from main import create_app
+from main import DEFAULT_FRONTEND_ORIGIN, create_app
 
 
 class CorsTests(unittest.TestCase):
@@ -59,9 +59,22 @@ class CorsTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers["access-control-allow-origin"], origin)
 
-    def test_absent_environment_configuration_does_not_allow_origins(self):
+    def test_absent_environment_configuration_allows_only_default_portless_origin(self):
         with patch.dict(os.environ, {}, clear=True), TestClient(create_app()) as client:
+            local = client.get("/", headers={"Origin": DEFAULT_FRONTEND_ORIGIN})
             response = client.get("/", headers={"Origin": "https://frontend.test"})
+
+        self.assertEqual(
+            local.headers["access-control-allow-origin"], DEFAULT_FRONTEND_ORIGIN
+        )
+        self.assertNotIn("access-control-allow-origin", response.headers)
+
+    def test_explicit_empty_environment_disables_cors(self):
+        with (
+            patch.dict(os.environ, {"CORS_ALLOWED_ORIGINS": ""}),
+            TestClient(create_app()) as client,
+        ):
+            response = client.get("/", headers={"Origin": DEFAULT_FRONTEND_ORIGIN})
 
         self.assertNotIn("access-control-allow-origin", response.headers)
 
