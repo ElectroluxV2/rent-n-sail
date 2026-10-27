@@ -251,58 +251,65 @@ test('frontend packaging uses the validated browser and SSR bundles', async (t) 
   ]);
 });
 
-test('publication binds private runtime configuration, not command-line secret values', async (t) => {
-  const directory = await temporary(t);
-  const previous = process.cwd();
-  process.chdir(directory);
-  try {
-    const fn = '.vercel/output/functions/app.func';
-    await fs.mkdir(fn, { recursive: true });
-    await fs.writeFile(
-      path.join(fn, '.vc-config.json'),
-      JSON.stringify({ filePathMap: { 'app.py': 'backend/main.py' } }),
-    );
-    const core = coreMock();
-    const env = {
-      COMPONENT: 'backend',
-      VERCEL_PROJECT_ID: 'backend',
-      VERCEL_FRONTEND_PROJECT_ID: 'frontend',
-      VERCEL_LOCAL_CONFIG: 'vercel.json',
-      DEPLOY_BRANCH: 'branch',
-      DEPLOY_TARGET: 'preview',
-      GITHUB_SHA: 'sha',
-    };
-    const provider = new Providers({ core, env });
-    provider.project = async (name) => ({ name });
-    provider.alias = async () => ({ projectId: 'frontend' });
-    provider.branch = async () => 'preview-db';
-    provider.connection = async () => provider.secret('postgresql://private');
-    provider.request = async () => ({ id: 'published' });
-    provider.assign = async (_host, project, id) =>
-      assert.deepEqual([project, id], ['backend', 'published']);
-    const exec = {
-      async getExecOutput(program, args, options) {
-        assert.equal(program, 'vercel');
-        assert.ok(args.includes('--prebuilt') && args.includes('DATABASE_URL'));
-        assert.ok(!args.join(' ').includes('postgresql://'));
-        assert.equal(options.env.DATABASE_URL, 'postgresql://private');
-        return {
-          exitCode: 0,
-          stdout: 'https://published.vercel.app\n',
-          stderr: 'postgresql://private',
-        };
-      },
-    };
-    await deploy.publish(provider, exec);
-    const config = JSON.parse(await fs.readFile(path.join(fn, '.vc-config.json')));
-    assert.equal(config.environment.DATABASE_URL, 'postgresql://private');
-    assert.deepEqual(config.filePathMap, { 'app.py': 'backend/main.py' });
-    assert.ok(!core.logs.join('\n').includes('postgresql://private'));
-    assert.equal(core.outputs.deployment_id, 'published');
-  } finally {
-    process.chdir(previous);
-  }
-});
+for (const target of ['preview', 'production'])
+  test(`${target} publication binds private runtime configuration, not command-line secret values`, async (t) => {
+    const directory = await temporary(t);
+    const previous = process.cwd();
+    process.chdir(directory);
+    try {
+      const fn = '.vercel/output/functions/app.func';
+      await fs.mkdir(fn, { recursive: true });
+      await fs.writeFile(
+        path.join(fn, '.vc-config.json'),
+        JSON.stringify({ filePathMap: { 'app.py': 'backend/main.py' } }),
+      );
+      const core = coreMock();
+      const env = {
+        COMPONENT: 'backend',
+        VERCEL_PROJECT_ID: 'backend',
+        VERCEL_FRONTEND_PROJECT_ID: 'frontend',
+        VERCEL_LOCAL_CONFIG: 'vercel.json',
+        DEPLOY_BRANCH: 'branch',
+        DEPLOY_TARGET: target,
+        GITHUB_SHA: 'sha',
+      };
+      const provider = new Providers({ core, env });
+      provider.project = async (name) => ({ name });
+      let frontendChecks = 0;
+      provider.alias = async (_hostname, project) => {
+        assert.equal(project, 'frontend');
+        frontendChecks++;
+        return { projectId: 'frontend' };
+      };
+      provider.branch = async () => 'preview-db';
+      provider.connection = async () => provider.secret('postgresql://private');
+      provider.request = async () => ({ id: 'published' });
+      provider.assign = async (_host, project, id) =>
+        assert.deepEqual([project, id], ['backend', 'published']);
+      const exec = {
+        async getExecOutput(program, args, options) {
+          assert.equal(program, 'vercel');
+          assert.ok(args.includes('--prebuilt') && args.includes('DATABASE_URL'));
+          assert.ok(!args.join(' ').includes('postgresql://'));
+          assert.equal(options.env.DATABASE_URL, 'postgresql://private');
+          return {
+            exitCode: 0,
+            stdout: 'https://published.vercel.app\n',
+            stderr: 'postgresql://private',
+          };
+        },
+      };
+      await deploy.publish(provider, exec);
+      const config = JSON.parse(await fs.readFile(path.join(fn, '.vc-config.json')));
+      assert.equal(config.environment.DATABASE_URL, 'postgresql://private');
+      assert.deepEqual(config.filePathMap, { 'app.py': 'backend/main.py' });
+      assert.ok(!core.logs.join('\n').includes('postgresql://private'));
+      assert.equal(core.outputs.deployment_id, 'published');
+      assert.equal(frontendChecks, 1);
+    } finally {
+      process.chdir(previous);
+    }
+  });
 
 test('workflows retain the ordered stack without an artifact or restore protocol', async () => {
   const stack = await fs.readFile(path.join(root, '.github/workflows/stack.yml'), 'utf8');

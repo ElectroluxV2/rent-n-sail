@@ -87,7 +87,8 @@ async function publish(provider, exec) {
   if (env.COMPONENT === 'backend') {
     const frontend = env.VERCEL_FRONTEND_PROJECT_ID;
     const frontendHost = aliasName((await provider.project(frontend)).name, branch, target);
-    if (target === 'preview' && !(await provider.alias(frontendHost, frontend))) {
+    const frontendAlias = await provider.alias(frontendHost, frontend);
+    if (target === 'preview' && !frontendAlias) {
       // Reserve/verify ownership before trusting this exact origin for CORS.
       await provider.assign(
         frontendHost,
