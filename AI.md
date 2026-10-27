@@ -1,5 +1,9 @@
 # AI usage docs
 
+## 2026-10-27 — Separate GitHub deployment environments by component
+
+- AI assistance: Junie (gpt-6-luna) changed the database, backend, and frontend reusable workflows to publish deployments into distinct GitHub Environments: `database-prev`/`database-prod`, `backend-prev`/`backend-prod`, and `frontend-prev`/`frontend-prod`. The existing `preview`/`production` deployment target passed to component provisioning remains unchanged. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
 ## 2026-10-27 — Prepare European hosting resources
 
 - AI assistance: Junie (gpt-6-luna) inspected the GitHub, Vercel, and Neon configuration; provisioned replacement Vercel projects (now `rent-n-sail-backend` and `rent-n-sail`) and Neon project `rent-n-sail-db-eu` in Frankfurt (`aws-eu-central-1`). Vercel’s Neon Marketplace integration was required because the only Neon organization is Vercel-managed. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).

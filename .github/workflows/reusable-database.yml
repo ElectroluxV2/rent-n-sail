@@ -28,7 +28,7 @@ jobs:
     name: Deployment
     runs-on: ubuntu-26.04
     environment:
-      name: ${{ inputs.target }}
+      name: ${{ inputs.target == 'production' && 'database-prod' || 'database-prev' }}
     outputs:
       instance_id: ${{ steps.report.outputs.instance_id }}
       address: ${{ steps.report.outputs.address }}
