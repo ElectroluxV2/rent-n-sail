@@ -4,6 +4,7 @@
 
 - AI assistance: OpenCode (Claude Opus 5.5) ran `stack.yml` through PR #14 after merging main. Run `40520812604` passed in 4m18s: database 22s, backend 180s, and frontend 46s, with about 3s between jobs. The backend's publish took 150s because Vercel installed the new AuthTuna dependencies from scratch. A follow-up backend build (`40521689277`) published in 23.7s, and its job took 52s. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
 - The deployed `/boats` returned 500 after the merge. A local Postgres container reproduced it: with its default SQLite database, AuthTuna registers its `PRAGMA foreign_keys=ON` listener on every SQLAlchemy engine, so psycopg connections failed. `backend/main.py` now moves that listener to AuthTuna's own engine. Locally, `/boats` then returned 200, and Ruff and the 9 backend tests pass.
+- Validation: signed, GitHub-Verified commit `d095fdc` passed stack run `40522452774` in 1m15s: database 21s, backend build 37s (publish 18.0s with Vercel's dependency cache warm), and frontend reuse 8s. The preview's `/boats` returned data again with the exact-origin CORS header, and SSR rendered the backend response.
 
 ## 2026-10-27 — Merged main's passkey flow and unit tests into the CI/CD branch
 
