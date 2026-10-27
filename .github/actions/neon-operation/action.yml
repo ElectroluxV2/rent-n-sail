@@ -23,4 +23,4 @@ runs:
       with:
         # language=javascript
         script: |
-          await require(process.env.CI_SCRIPT)({ github, context, core });
+          await require(process.env.CI_SCRIPT)({ core });

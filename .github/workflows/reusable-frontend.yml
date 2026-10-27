@@ -19,7 +19,6 @@ on:
         value: ${{ jobs.frontend.outputs.url }}
 permissions:
   contents: read
-  actions: read
   pull-requests: write
 jobs:
   frontend:
@@ -51,7 +50,6 @@ jobs:
         with:
           path: frontend/
       - name: 🧭 Select build path
-        id: selection
         uses: actions/github-script@v9.0.0
         env:
           BUILD: ${{ inputs.build || steps.changes.outputs.changed == 'true' || github.event.action == 'opened' || github.event.action == 'reopened' }}
@@ -59,45 +57,43 @@ jobs:
           # language=javascript
           script: |
             const build = process.env.BUILD === 'true';
-            core.info(build ? 'Build path: run validation and build the frontend.' : 'Build path: reuse the preview, or restore production output if absent.');
-            core.setOutput('build', build);
+            core.info(build ? 'Build path: validate and deploy the frontend.' : 'No frontend changes: leave the existing deployment untouched.');
             core.exportVariable('BUILD_REQUESTED', String(build));
       - name: 📥 Checkout source
-        id: source
-        if: steps.selection.outputs.build == 'true'
+        if: env.BUILD_REQUESTED == 'true'
         uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
       - name: ⚙️ Set up Node.js and pnpm
         uses: pnpm/setup@v3.1.1
-        if: steps.selection.outputs.build == 'true'
+        if: env.BUILD_REQUESTED == 'true'
         with:
           working-directory: frontend
           cache: true
       - name: 🧹 Lint
         id: lint
-        if: steps.selection.outputs.build == 'true'
+        if: env.BUILD_REQUESTED == 'true'
         continue-on-error: true
         working-directory: frontend
         # language=bash
         run: pnpm exec eslint . --format gha
       - name: 🎨 Check formatting
         id: format
-        if: steps.selection.outputs.build == 'true'
+        if: env.BUILD_REQUESTED == 'true'
         continue-on-error: true
         uses: oxc-project/oxfmt-action@v0.0.1
         with:
           working-directory: frontend
       - name: 🧪 Run tests
         id: tests
-        if: steps.selection.outputs.build == 'true'
+        if: env.BUILD_REQUESTED == 'true'
         continue-on-error: true
         working-directory: frontend
         # language=bash
         run: pnpm exec ng test --watch=false --reporters=default --reporters=github-actions
       - name: 🔨 Build application
         id: build
-        if: steps.selection.outputs.build == 'true'
+        if: env.BUILD_REQUESTED == 'true'
         continue-on-error: true
         working-directory: frontend
         # language=bash
@@ -112,5 +108,4 @@ jobs:
         id: deploy
         uses: $/.github/actions/vercel-prebuilt-deploy
         env:
-          RNS_SOURCE_READY: ${{ steps.source.outcome == 'success' }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}

@@ -12,7 +12,7 @@ The frontend is compiled once during validation. The deployment action packages 
 
 `database.yml`, `backend.yml`, and `frontend.yml` are manual-only entry points; each calls only its corresponding reusable workflow. Manual application runs default to a build. Backend credentials are read privately from the matching Neon branch; the frontend reads its matching READY backend deployment through Vercel. Missing dependencies fail with an instruction to run the relevant workflow; no reusable workflow invokes another application's CI/CD. The frontend receives no Neon secrets.
 
-Local actions and reusable workflows use `$/` references, so they resolve to their defining repository's running commit without requiring a workspace checkout. Source is fetched only before application validation/builds or database migration tools; provider discovery runs from downloaded action snapshots. Both automatic and manual reuse-only application runs need no checkout. Production-output restoration checks out deployment configuration only after selecting that path, and an existing validated frontend build is never erased by a redundant checkout.
+Local actions and reusable workflows use `$/` references, so they resolve to their defining repository's running commit without requiring a workspace checkout. Source is fetched only before application validation/builds or database migration tools. Both automatic and manual reuse-only application runs need no checkout, toolchain setup, or Vercel CLI.
 
 Every target is serialized across automatic/manual runs with a non-cancelling queue. Each application/database also has a shared per-target concurrency group and a GitHub Environment.
 
@@ -21,7 +21,7 @@ Every target is serialized across automatic/manual runs with a non-cancelling qu
 Every configured workflow/composite step has an explicit emoji-prefixed name. The same purpose uses the same prefix across jobs:
 
 - 📥 fetch/checkout/restore; 📤 upload/cache save.
-- ⚙️ tool setup; 📦 dependency installation; 🗜️ artifact packaging.
+- ⚙️ tool setup; 📦 dependency installation.
 - 🔍 change detection; 🧭 path/reference selection; 🔗 resource resolution; 🌱 branch preparation; 🔐 credentials.
 - 🧹 lint; 🎨 formatting; 🧪 tests; 🔨 builds.
 - 🚀 publication/migrations; 📝 reports; ❌ failures.
@@ -46,17 +46,15 @@ The Neon REST resolver checks for `preview/<git-branch>` first and creates a cop
 
 GitHub Actions now owns explicit preview branch preparation so database-first ordering is possible. The existing Vercel–Neon resource connection may remain, but avoid two competing preview-branching mechanisms. Workflow runtime bindings explicitly select the prepared branch. Branch cleanup is not automatic; delete obsolete previews deliberately in Neon after closing branches.
 
-## Selective builds and portable output
+## Selective builds and deployment reuse
 
-For an unchanged application, the resolver checks for an existing READY deployment for the current branch first. If present, it reports the existing URL and stops: no other application's dependency lookup, CLI setup, application validation, clone, rebuild, redeployment, alias change, or credential rebind—even when source/configuration has changed since an earlier unsuccessful run. This is the requested per-push policy; there is no source/config fingerprint override. Only when that preview is absent does it restore production's retained compiled output and bind it to the preview environment. Changed applications run their own full validation/build path.
+For an unchanged application, one Vercel query selects its latest READY deployment by project, branch, and target (`limit=1`). The action reports that deployment ID/URL and stops: no dependency lookup, checkout, CLI setup, validation, build, redeployment, alias change, or credential rebind. There is no source/config fingerprint override. Changed applications run their own validation/build/publication path.
 
-Vercel's [documented create-deployment API](https://vercel.com/docs/rest-api/deployments/create-a-new-deployment) describes `deploymentId` as a new build. Promotion changes production traffic, not preview runtime configuration. Until a supported zero-build clone endpoint is available, a small GitHub artifact containing compiled Build Output is the portable fallback; no OCI registry is used.
+PR opening/reopening builds both applications, establishing the previews for later no-op runs. If a READY deployment is missing (for example after manual deletion), run that application's manual workflow once with `build=true`. The no-change path never falls back to another branch or production database bindings, and never silently rebuilds.
 
-The archive is retained for 90 days. Deployment metadata identifies its immutable artifact ID, run, and name. Restoration validates those references and repository provenance. It contains only the public Build Output v3 contract (`config.json`, functions, static files), not target-bound CLI `builds.json`, diagnostics, or caches. Python `filePathMap` entries are materialized into each function, including application code and vendored dependencies. Tar extraction rejects traversal. Checkout-local build symlinks are materialized; external symlinks are rejected. The versioned artifact contract rejects earlier incomplete formats.
+There are no GitHub artifact uploads/downloads, archive extraction, retention/provenance metadata, private state files, or production-output restoration. Reuse means keeping the existing deployment ID, not calling Vercel's redeploy endpoint (which creates a new deployment/build).
 
-Compilation intentionally does not load the private environment downloaded by `vercel pull`; target-specific bindings belong at runtime. Artifacts exclude `.env*` files and runtime credentials. Only an allowlist of transport-neutral runtime hints is retained in function metadata. Known credential bytes in other output files cause upload to fail. Target-specific `DATABASE_URL`, explicit CORS origins, `BACKEND_URL`, and `FRONTEND_URL` are applied only **after** the portable artifact has been uploaded, both to function metadata and explicitly to deployment scope. Vercel's valueless `--env NAME` arguments read values from the process environment, so credentials do not appear in command arguments. Raw database credentials never cross job outputs.
-
-An existing production deployment created before this artifact contract has no reusable artifact. Bootstrap each application once with its manual workflow and `build=true` (after the workflow files reach the default branch), or let the first changed production build create one. Missing/expired artifacts fail with an actionable message rather than triggering a hidden rebuild.
+Compilation does not load the private environment downloaded by `vercel pull`. Publication resolves target-specific `DATABASE_URL`, explicit CORS origins, `BACKEND_URL`, and `FRONTEND_URL` and binds them to function metadata and deployment scope. Vercel's valueless `--env NAME` arguments read process environment values, keeping credentials out of command arguments and job outputs. The native Vercel CLI handles Python `filePathMap` uploads directly; there is no custom file materialization or copying layer.
 
 ## URLs and runtime configuration
 
@@ -66,7 +64,7 @@ The backend exposes `/`, `/health`, and `/boats` directly, without an `/api` pre
 
 Backend preview URLs must be accessible to browser API calls. Vercel team-login protection cannot be solved by exposing an automation bypass secret to JavaScript. Configure the backend API's deployment protection deliberately; these workflows do not silently disable project security.
 
-Publication waits for Vercel's READY status, assigns the stable URL, and records deployment outputs/summaries. Post-deployment HTTP/CORS/SSR probes and runtime-log debugging have been removed; deployment success does not claim an end-to-end browser validation. Normal lint, formatting, application tests, build checks, artifact provenance checks, and credential-safety checks remain in place. Existing READY previews are reused without CLI setup, as required by the no-op reuse policy.
+The Vercel CLI waits for READY; publication then assigns the stable URL and records outputs/summaries. There are no extra deployment probes or runtime-log debugging. Normal application lint, formatting, tests, and build checks remain in place. Provider/CLI failures still fail the run; credential redaction and alias ownership checks are retained, without retry frameworks or speculative recovery paths.
 
 Jobs have no fork-PR skip condition. Fork PRs still do not receive repository secrets under the normal `pull_request` trigger, so credential-backed operations fail with a missing-configuration error rather than publishing. There is no privileged `pull_request_target` checkout of fork code.
 

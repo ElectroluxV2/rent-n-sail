@@ -1,7 +1,7 @@
 const { Providers, required } = require('../_shared/providers.cjs');
 
-module.exports = async ({ core, github }) => {
-  const provider = new Providers({ core, github });
+module.exports = async ({ core }) => {
+  const provider = new Providers({ core });
   switch (process.env.NEON_OPERATION) {
     case 'database-plan':
       core.setOutput('parent_branch_id', await provider.parent());

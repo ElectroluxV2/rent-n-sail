@@ -1,5 +1,12 @@
 # AI usage docs
 
+## 2026-10-27 — Simplify deployment reuse and remove artifact machinery
+
+- AI assistance: OpenCode (GPT-6.1 Sol) followed the request to preserve normal CI/CD behavior while reducing orchestration complexity. Removed the GitHub artifact upload/download/restore protocol, archive safety/retention/provenance machinery, private state files, Python output materialization, repeated mode plumbing, and custom provider retry/error wrappers. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- Unchanged applications now perform a filtered latest-READY Vercel lookup and report the existing deployment ID/URL, with no build, publication, alias write, dependency lookup, checkout, or CLI setup. Initial PR opening/reopening still builds previews; a missing/deleted preview requires one explicit `build=true` run rather than a hidden rebuild or another environment's credentials. Vercel's redeploy-by-ID endpoint creates a new deployment/build, so it is deliberately not called for unchanged applications.
+- Changed applications still validate/build independently and publish native prebuilt output with private runtime bindings. Retained the small Angular SSR output descriptor, exact CORS/alias ownership checks, secret masking, database-first ordering, unconditional pending migrations, summaries, step names, and checkout-free local action loading. Python file mappings are left to Vercel's native uploader.
+- Local validation: the reduced 18-test orchestration suite passes, including read-only reuse, server-side latest-deployment filtering, Neon idempotence, private credentials, native Python mappings, SSR packaging, and the ordered stack. YAML/action-lock checks pass with the existing modern-syntax/runner-label exceptions.
+
 ## 2026-10-27 — PR #14 review follow-up
 
 - AI assistance: OpenCode (GPT-6.1 Sol) implemented the latest review comments: removed reusable job skip conditions, shared concurrency/environment names with YAML anchors, renamed the caller to `stack.yml`, and removed the obsolete migration test and Bash CI test script. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
@@ -7,6 +14,7 @@
 - Replaced runtime-config fetching, preload initialization, and missing-SSR error handling with the composable `provideBackendApiUrl` provider and SSR TransferState. Added explicit default Portless origins, removed mandatory local environment-file setup, simplified Portless commands, and documented `pnpm env use --global 24`.
 - Preserved private deployment credentials, explicit CORS allowlists, retained compiled output, and checkout-free no-op preview reuse. No merge or rebase of newer `main` was performed.
 - Validation: 33 Node orchestration tests, 5 frontend tests, backend tests (8 tests and 9 subtests), application lint/format checks, Angular production build, actionlint (existing modern-syntax/runner-label exceptions), action-lock verification, and diff checks passed. An isolated packaged SSR check rendered a backend fixture and transferred its URL; its initial raw-HTML URL assertion was corrected to parse Angular's escaped TransferState JSON. The JavaScript restore implementation also restored the actual retained backend v2 artifact successfully.
+- Pushed signed/Verified commit `ec906e6`; manual backend run `40427968026` and frontend run `40428192095` passed. Replied to and resolved all 12 new review threads and resolved 30 older implemented threads; a complete query confirmed all 54 PR threads resolved. Automatic PR CI is still blocked by conflicts with newer `main`; no merge/rebase was started.
 
 ## 2026-10-27 — JavaScript orchestration through actions/github-script
 

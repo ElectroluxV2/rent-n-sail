@@ -1,33 +1,25 @@
 name: Ensure Vercel deployment
-description: Reuse a ready branch deployment or publish portable prebuilt output with target-specific runtime configuration.
+description: Leave unchanged deployments alone; publish changed applications with private runtime bindings.
 outputs:
   url:
     description: Stable URL for this application's target environment.
-    value: ${{ steps.publish.outputs.url }}
+    value: ${{ steps.publish.outputs.url || steps.existing.outputs.url }}
 runs:
   using: composite
   steps:
-    - name: 🔗 Resolve deployment
-      id: resolve
+    - name: 🔗 Resolve existing deployment
+      id: existing
+      if: env.BUILD_REQUESTED != 'true'
       uses: actions/github-script@v9.0.0
       env:
-        DEPLOY_OPERATION: plan
+        DEPLOY_OPERATION: reuse
         CI_SCRIPT: ${{ github.action_path }}/deploy.cjs
       with:
         # language=javascript
         script: |
-          await require(process.env.CI_SCRIPT)({ github, context, core, exec });
-    - name: 📥 Checkout deployment configuration
-      if: steps.resolve.outputs.mode != 'reuse' && env.RNS_SOURCE_READY != 'true'
-      uses: actions/checkout@v7.0.1
-      env:
-        VERCEL_TOKEN: ""
-        NEON_API_KEY: ""
-        GITHUB_TOKEN: ""
-      with:
-        persist-credentials: false
+          await require(process.env.CI_SCRIPT)({ core, exec });
     - name: ⚙️ Set up Vercel CLI
-      if: steps.resolve.outputs.mode != 'reuse'
+      if: env.BUILD_REQUESTED == 'true'
       uses: $/.github/actions/setup-vercel-cli
       env:
         # Security: dependency installation must not receive deployment credentials.
@@ -35,7 +27,7 @@ runs:
         NEON_API_KEY: ""
         GITHUB_TOKEN: ""
     - name: 📥 Pull project settings
-      if: steps.resolve.outputs.mode != 'reuse'
+      if: env.BUILD_REQUESTED == 'true'
       uses: actions/github-script@v9.0.0
       env:
         DEPLOY_OPERATION: pull
@@ -43,9 +35,9 @@ runs:
       with:
         # language=javascript
         script: |
-          await require(process.env.CI_SCRIPT)({ github, context, core, exec });
+          await require(process.env.CI_SCRIPT)({ core, exec });
     - name: 🔨 Build application
-      if: steps.resolve.outputs.mode == 'build'
+      if: env.BUILD_REQUESTED == 'true'
       uses: actions/github-script@v9.0.0
       env:
         DEPLOY_OPERATION: build
@@ -53,62 +45,18 @@ runs:
       with:
         # language=javascript
         script: |
-          await require(process.env.CI_SCRIPT)({ github, context, core, exec });
-    - name: 🗜️ Package build output
-      if: steps.resolve.outputs.mode == 'build'
-      uses: actions/github-script@v9.0.0
-      env:
-        DEPLOY_OPERATION: pack
-        CI_SCRIPT: ${{ github.action_path }}/deploy.cjs
-      with:
-        # language=javascript
-        script: |
-          await require(process.env.CI_SCRIPT)({ github, context, core, exec });
-    - name: 📤 Upload build output
-      id: artifact
-      if: steps.resolve.outputs.mode == 'build'
-      uses: actions/upload-artifact@v7.0.2
-      with:
-        name: rns-${{ env.COMPONENT }}-${{ github.run_id }}-${{ github.run_attempt }}
-        path: ${{ runner.temp }}/rns-artifact/build-output.tar.gz
-        compression-level: 0
-        retention-days: 90
-        if-no-files-found: error
-    - name: 📥 Download build output
-      if: steps.resolve.outputs.mode == 'restore'
-      uses: actions/github-script@v9.0.0
-      env:
-        DEPLOY_OPERATION: download
-        CI_SCRIPT: ${{ github.action_path }}/deploy.cjs
-        GH_TOKEN: ${{ github.token }}
-        SOURCE_RUN: ${{ steps.resolve.outputs.artifact_run_id }}
-        SOURCE_ARTIFACT: ${{ steps.resolve.outputs.artifact_name }}
-      with:
-        # language=javascript
-        script: |
-          await require(process.env.CI_SCRIPT)({ github, context, core, exec });
-    - name: 📥 Restore build output
-      if: steps.resolve.outputs.mode == 'restore'
-      uses: actions/github-script@v9.0.0
-      env:
-        DEPLOY_OPERATION: restore
-        CI_SCRIPT: ${{ github.action_path }}/deploy.cjs
-      with:
-        # language=javascript
-        script: |
-          await require(process.env.CI_SCRIPT)({ github, context, core, exec });
+          await require(process.env.CI_SCRIPT)({ core, exec });
     - name: 🚀 Publish deployment
       id: publish
+      if: env.BUILD_REQUESTED == 'true'
       uses: actions/github-script@v9.0.0
       env:
         DEPLOY_OPERATION: publish
         CI_SCRIPT: ${{ github.action_path }}/deploy.cjs
-        BUILD_ARTIFACT_ID: ${{ steps.artifact.outputs.artifact-id }}
-        BUILD_ARTIFACT_NAME: rns-${{ env.COMPONENT }}-${{ github.run_id }}-${{ github.run_attempt }}
       with:
         # language=javascript
         script: |
-          await require(process.env.CI_SCRIPT)({ github, context, core, exec });
+          await require(process.env.CI_SCRIPT)({ core, exec });
     - name: ❌ Report deployment failure
       if: failure()
       uses: actions/github-script@v9.0.0
