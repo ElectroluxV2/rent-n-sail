@@ -10,7 +10,7 @@ runs:
     - name: 🔗 Resolve existing deployment
       id: existing
       if: env.BUILD_REQUESTED != 'true'
-      uses: actions/github-script@v9.0.0
+      uses: $/.github/actions/provider-script
       env:
         DEPLOY_OPERATION: reuse
         CI_SCRIPT: ${{ github.action_path }}/deploy.cjs
@@ -49,7 +49,7 @@ runs:
     - name: 🚀 Publish deployment
       id: publish
       if: env.BUILD_REQUESTED == 'true'
-      uses: actions/github-script@v9.0.0
+      uses: $/.github/actions/provider-script
       env:
         DEPLOY_OPERATION: publish
         CI_SCRIPT: ${{ github.action_path }}/deploy.cjs

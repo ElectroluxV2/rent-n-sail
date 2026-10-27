@@ -13,6 +13,7 @@ workflows:
         - 'astral-sh/setup-uv@v10.3.2'
         - 'pnpm/setup@v3.1.1'
     '.github/workflows/reusable-database.yml':
+        - 'actions/cache@v6.1.0'
         - 'actions/checkout@v7.0.1'
         - 'actions/github-script@v9.0.0'
         - 'astral-sh/setup-uv@v10.3.2'

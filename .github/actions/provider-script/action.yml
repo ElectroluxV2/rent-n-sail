@@ -1,0 +1,75 @@
+name: GitHub script with provider clients
+description: Run github-script with cached, lockfile-pinned Neon and Vercel SDKs.
+inputs:
+  script:
+    description: JavaScript body executed by actions/github-script.
+    required: true
+outputs:
+  url:
+    description: Public application URL.
+    value: ${{ steps.script.outputs.url }}
+  deployment_id:
+    description: Non-secret Vercel deployment ID.
+    value: ${{ steps.script.outputs.deployment_id }}
+  branch_id:
+    description: Non-secret Neon preview branch ID.
+    value: ${{ steps.script.outputs.branch_id }}
+  parent_branch_id:
+    description: Non-secret Neon production parent ID.
+    value: ${{ steps.script.outputs.parent_branch_id }}
+runs:
+  using: composite
+  steps:
+    - name: ⚙️ Locate provider client cache
+      id: sdk
+      uses: actions/github-script@v9.0.0
+      env:
+        SDK_MANIFEST: ${{ github.action_path }}
+      with:
+        # language=javascript
+        script: |
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const { createHash } = require('node:crypto');
+          const hash = createHash('sha256').update(fs.readFileSync(path.join(process.env.SDK_MANIFEST, 'package-lock.json'))).digest('hex');
+          const directory = path.join(process.env.RUNNER_TOOL_CACHE, 'provider-sdk', hash);
+          core.setOutput('directory', directory);
+          core.setOutput('key', `provider-sdk-v1-${process.platform}-${process.arch}-node${process.versions.node.split('.')[0]}-${hash}`);
+          core.setOutput('ready', fs.existsSync(path.join(directory, 'node_modules/.package-lock.json')));
+    - name: 📥 Restore provider clients
+      id: cache
+      if: steps.sdk.outputs.ready != 'true'
+      uses: actions/cache/restore@v6.1.0
+      with:
+        path: ${{ steps.sdk.outputs.directory }}
+        key: ${{ steps.sdk.outputs.key }}
+    - name: 📦 Install provider clients
+      if: steps.sdk.outputs.ready != 'true' && steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        SDK_DIRECTORY: ${{ steps.sdk.outputs.directory }}
+        SDK_MANIFEST: ${{ github.action_path }}
+        # Package installation never receives provider/database credentials.
+        VERCEL_TOKEN: ""
+        NEON_API_KEY: ""
+        GH_TOKEN: ""
+        GITHUB_TOKEN: ""
+        DATABASE_URL: ""
+      # language=bash
+      run: |
+        mkdir -p "$SDK_DIRECTORY"
+        cp "$SDK_MANIFEST"/package{,-lock}.json "$SDK_DIRECTORY/"
+        npm ci --prefix "$SDK_DIRECTORY" --ignore-scripts --omit=dev --no-audit --no-fund
+    - name: 📤 Cache provider clients
+      if: steps.sdk.outputs.ready != 'true' && steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6.1.0
+      with:
+        path: ${{ steps.sdk.outputs.directory }}
+        key: ${{ steps.sdk.outputs.key }}
+    - name: 🔗 Run provider script
+      id: script
+      uses: actions/github-script@v9.0.0
+      env:
+        PROVIDER_DEPS_DIR: ${{ steps.sdk.outputs.directory }}
+      with:
+        script: ${{ inputs.script }}

@@ -16,11 +16,28 @@ runs:
   steps:
     - name: 🔗 Resolve Neon resource
       id: operation
-      uses: actions/github-script@v9.0.0
+      uses: $/.github/actions/provider-script
       env:
         NEON_OPERATION: ${{ inputs.operation }}
-        CI_SCRIPT: ${{ github.action_path }}/neon.cjs
+        PROVIDERS_MODULE: ${{ github.action_path }}/../_shared/providers.cjs
       with:
         # language=javascript
         script: |
-          await require(process.env.CI_SCRIPT)({ core });
+          const { createProviders } = require(process.env.PROVIDERS_MODULE);
+          const providers = createProviders({ core });
+          const operations = {
+            'database-plan': async () => {
+              core.setOutput('parent_branch_id', await providers.getProductionDatabase());
+            },
+            'database-branch': async () => {
+              core.setOutput('branch_id', await providers.getDatabasePreviewFor({ create: true }));
+            },
+            'database-env': async () => {
+              // Credentials stay in this job, never in action or script-result outputs.
+              core.exportVariable('DATABASE_URL', await providers.getDatabaseConnectionFor({
+                branchId: process.env.NEON_BRANCH_ID,
+                pooled: false,
+              }));
+            },
+          };
+          await operations[process.env.NEON_OPERATION]();

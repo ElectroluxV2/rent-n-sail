@@ -1,4 +1,7 @@
 const { createHash } = require('node:crypto');
+const { createRequire } = require('node:module');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 
 function aliasName(project, branch, target) {
   if (target === 'production') return `${project}.vercel.app`;
@@ -6,7 +9,7 @@ function aliasName(project, branch, target) {
   return `${project.slice(0, 42)}-preview-${digest}.vercel.app`;
 }
 
-function createProviders({ core, env = process.env }) {
+function createProviders({ core, env = process.env, clients = {} }) {
   const secrets = Object.entries(env)
     .filter(([name]) => /TOKEN|API_KEY|DATABASE_URL/.test(name))
     .map(([, value]) => value)
@@ -18,42 +21,47 @@ function createProviders({ core, env = process.env }) {
     projectId: env.VERCEL_PROJECT_ID,
   };
 
-  async function request(provider, method, route, data, missing = false) {
-    const url = new URL(
-      `${provider === 'neon' ? 'https://console.neon.tech/api/v2' : 'https://api.vercel.com'}${route}`,
-    );
-    const token = env[provider === 'neon' ? 'NEON_API_KEY' : 'VERCEL_TOKEN'];
-    if (!token) throw new Error(`Configure the ${provider} API token before deploying.`);
-    if (provider === 'vercel') url.searchParams.set('teamId', env.VERCEL_ORG_ID);
-    const response = await fetch(url, {
-      method,
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: data === undefined ? undefined : JSON.stringify(data),
-      signal: AbortSignal.timeout(60_000),
-    });
-    if (missing && response.status === 404) return null;
-    // Error bodies can contain private connection details; report status only.
-    if (!response.ok) throw new Error(`${provider} ${method} failed (HTTP ${response.status}).`);
-    return response.json();
+  async function client(provider) {
+    if (!clients[provider]) {
+      const resolve = createRequire(path.join(env.PROVIDER_DEPS_DIR, 'package.json'));
+      const name = provider === 'vercel' ? '@vercel/sdk' : '@neon/sdk';
+      const sdk = await import(pathToFileURL(resolve.resolve(name)).href);
+      clients[provider] =
+        provider === 'vercel'
+          ? new sdk.Vercel({
+              bearerToken: env.VERCEL_TOKEN,
+              timeoutMs: 60_000,
+              retryConfig: { strategy: 'none' },
+            })
+          : sdk.createNeonClient({
+              apiKey: env.NEON_API_KEY,
+              throwOnError: true,
+              retries: 0,
+              requestTimeoutMs: 60_000,
+              waitForReadiness: false,
+            });
+    }
+    return clients[provider];
   }
 
-  async function databaseBranches(search) {
-    const branches = [];
-    let cursor;
-    do {
-      const query = new URLSearchParams({ limit: '100' });
-      if (search) query.set('search', search);
-      if (cursor) query.set('cursor', cursor);
-      const page = await request('neon', 'GET', `/projects/${project}/branches?${query}`);
-      branches.push(...page.branches);
-      cursor = page.pagination?.next;
-    } while (cursor);
-    return branches;
+  async function request(provider, operation, missing = false) {
+    const sdk = await client(provider);
+    try {
+      return await operation(sdk);
+    } catch (error) {
+      const status = error.statusCode ?? error.status;
+      if (missing && status === 404) return null;
+      // SDK errors can retain raw bodies and connection details; expose status only.
+      throw new Error(`${provider} request failed (HTTP ${status ?? 'unknown'}).`);
+    }
   }
 
   async function getProductionDatabase() {
     const selected = env.NEON_PARENT_BRANCH_ID;
-    const parent = (await databaseBranches()).find((branch) =>
+    const branches = await request('neon', (sdk) =>
+      sdk.branches.list({ projectId: project }).all(),
+    );
+    const parent = branches.find((branch) =>
       selected ? branch.id === selected || branch.name === selected : branch.default,
     );
     if (!parent)
@@ -64,14 +72,17 @@ function createProviders({ core, env = process.env }) {
 
   async function getDatabasePreviewFor({ branch = defaults.branch, create = false } = {}) {
     const name = `preview/${branch}`;
-    let preview = (await databaseBranches(name)).find((candidate) => candidate.name === name);
+    const branches = await request('neon', (sdk) =>
+      sdk.branches.list({ projectId: project, search: name }).all(),
+    );
+    let preview = branches.find((candidate) => candidate.name === name);
     if (preview) core.info(`Reusing Neon branch ${name} (${preview.id}).`);
     else {
       if (!create) throw new Error('Run the database workflow first to create its preview branch.');
-      ({ branch: preview } = await request('neon', 'POST', `/projects/${project}/branches`, {
-        branch: { name, parent_id: await getProductionDatabase() },
-        endpoints: [{ type: 'read_write' }],
-      }));
+      const parentId = await getProductionDatabase();
+      preview = await request('neon', (sdk) =>
+        sdk.branches.create({ projectId: project, name, parent_id: parentId }),
+      );
       core.info(`Created Neon branch ${name} (${preview.id}).`);
     }
     return preview.id;
@@ -79,22 +90,31 @@ function createProviders({ core, env = process.env }) {
 
   async function getDatabaseConnectionFor({ branchId, pooled }) {
     core.info(`Resolving private database connection for ${branchId} (pooled=${pooled}).`);
-    const query = new URLSearchParams({
-      branch_id: branchId,
-      pooled: String(pooled),
-      database_name: env.NEON_DATABASE_NAME || 'neondb',
-      role_name: env.NEON_ROLE_NAME || 'neondb_owner',
-    });
-    const { uri } = await request('neon', 'GET', `/projects/${project}/connection_uri?${query}`);
+    const uri = await request('neon', (sdk) =>
+      sdk.postgres.connectionString({
+        projectId: project,
+        branchId,
+        pooled,
+        databaseName: env.NEON_DATABASE_NAME || 'neondb',
+        roleName: env.NEON_ROLE_NAME || 'neondb_owner',
+      }),
+    );
     secrets.push(uri);
     core.setSecret(uri);
     return uri;
   }
 
   async function latestDeployment({ projectId, branch, target }) {
-    const query = new URLSearchParams({ projectId, state: 'READY', target, limit: '1' });
-    if (target === 'preview') query.set('branch', branch);
-    const { deployments } = await request('vercel', 'GET', `/v7/deployments?${query}`);
+    const { deployments } = await request('vercel', (sdk) =>
+      sdk.deployments.getDeployments({
+        teamId: env.VERCEL_ORG_ID,
+        projectId,
+        state: 'READY',
+        target,
+        limit: 1,
+        branch: target === 'preview' ? branch : undefined,
+      }),
+    );
     if (!deployments.length)
       throw new Error(
         `No READY ${target} deployment for ${projectId}. Run its workflow with build=true once.`,
@@ -105,9 +125,7 @@ function createProviders({ core, env = process.env }) {
   async function ownedAlias(hostname, projectId) {
     const alias = await request(
       'vercel',
-      'GET',
-      `/v4/aliases/${encodeURIComponent(hostname)}`,
-      undefined,
+      (sdk) => sdk.aliases.getAlias({ idOrAlias: hostname, teamId: env.VERCEL_ORG_ID }),
       true,
     );
     if (alias && alias.projectId !== projectId)
@@ -116,18 +134,20 @@ function createProviders({ core, env = process.env }) {
   }
 
   async function applicationHostname({ projectId, branch, target }) {
-    const { name } = await request(
-      'vercel',
-      'GET',
-      `/v9/projects/${encodeURIComponent(projectId)}`,
+    const { name } = await request('vercel', (sdk) =>
+      sdk.projects.getProject({ idOrName: projectId, teamId: env.VERCEL_ORG_ID }),
     );
     return aliasName(name, branch, target);
   }
 
   async function assignAlias(hostname, deploymentId) {
-    await request('vercel', 'POST', `/v2/deployments/${encodeURIComponent(deploymentId)}/aliases`, {
-      alias: hostname,
-    });
+    await request('vercel', (sdk) =>
+      sdk.aliases.assignAlias({
+        id: deploymentId,
+        teamId: env.VERCEL_ORG_ID,
+        requestBody: { alias: hostname },
+      }),
+    );
   }
 
   async function getApplicationDeploymentFor(params = {}) {
@@ -175,10 +195,8 @@ function createProviders({ core, env = process.env }) {
 
   async function assignApplicationDeploymentFor({ url, ...params }) {
     const selection = { ...defaults, ...params };
-    const { id } = await request(
-      'vercel',
-      'GET',
-      `/v13/deployments/${encodeURIComponent(new URL(url).hostname)}`,
+    const { id } = await request('vercel', (sdk) =>
+      sdk.deployments.getDeployment({ idOrUrl: new URL(url).hostname, teamId: env.VERCEL_ORG_ID }),
     );
     const hostname = await applicationHostname(selection);
     await ownedAlias(hostname, selection.projectId);

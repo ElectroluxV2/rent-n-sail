@@ -3,7 +3,6 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
-const neon = require('../actions/neon-operation/neon.cjs');
 const deploy = require('../actions/vercel-prebuilt-deploy/deploy.cjs');
 const { packageFrontend } = require('../actions/vercel-prebuilt-deploy/output.cjs');
 const { createProviders } = require('../actions/_shared/providers.cjs');
@@ -39,7 +38,7 @@ function coreMock() {
     },
   };
 }
-function fixture(t, handler, overrides = {}) {
+function fixture(handler, overrides = {}) {
   const core = coreMock();
   const env = {
     VERCEL_TOKEN: 'vercel-token',
@@ -47,18 +46,38 @@ function fixture(t, handler, overrides = {}) {
     VERCEL_PROJECT_ID: 'backend',
     VERCEL_FRONTEND_PROJECT_ID: 'frontend',
     VERCEL_BACKEND_PROJECT_ID: 'backend',
+    NEON_PROJECT_ID: 'project',
     DEPLOY_BRANCH: 'feature/a',
     DEPLOY_TARGET: 'preview',
     ...overrides,
   };
   const calls = [];
-  t.mock.method(globalThis, 'fetch', async (url, options) => {
-    const call = { url, method: options.method, body: options.body && JSON.parse(options.body) };
+  const method = (provider, operation) => async (params) => {
+    const call = { provider, operation, params };
     calls.push(call);
-    const value = await handler(call);
-    return value instanceof Response ? value : Response.json(value);
-  });
-  return { core, env, calls, providers: createProviders({ core, env }) };
+    return handler(call);
+  };
+  const clients = {
+    vercel: {
+      projects: { getProject: method('vercel', 'getProject') },
+      deployments: {
+        getDeployments: method('vercel', 'getDeployments'),
+        getDeployment: method('vercel', 'getDeployment'),
+      },
+      aliases: {
+        getAlias: method('vercel', 'getAlias'),
+        assignAlias: method('vercel', 'assignAlias'),
+      },
+    },
+    neon: {
+      branches: {
+        list: (params) => ({ all: () => method('neon', 'listBranches')(params) }),
+        create: method('neon', 'createBranch'),
+      },
+      postgres: { connectionString: method('neon', 'connectionString') },
+    },
+  };
+  return { core, env, calls, providers: createProviders({ core, env, clients }) };
 }
 async function temporary(t) {
   const directory = await fs.mkdtemp(
@@ -69,23 +88,24 @@ async function temporary(t) {
 }
 
 for (const component of ['frontend', 'backend'])
-  test(`${component}: reuse is read-only and needs no database client`, async (t) => {
+  test(`${component}: reuse is read-only and needs no database client`, async () => {
     const context = fixture(
-      t,
-      ({ url, method }) => {
-        assert.equal(method, 'GET');
-        assert.equal(url.hostname, 'api.vercel.com');
-        if (url.pathname === '/v7/deployments') {
-          assert.equal(url.searchParams.get('projectId'), component);
-          assert.equal(url.searchParams.get('branch'), 'feature/a');
-          assert.equal(url.searchParams.get('target'), 'preview');
-          assert.equal(url.searchParams.get('state'), 'READY');
-          assert.equal(url.searchParams.get('limit'), '1');
+      ({ provider, operation, params }) => {
+        assert.equal(provider, 'vercel');
+        if (operation === 'getDeployments') {
+          assert.deepEqual(params, {
+            teamId: 'team',
+            projectId: component,
+            branch: 'feature/a',
+            target: 'preview',
+            state: 'READY',
+            limit: 1,
+          });
           return {
             deployments: [{ uid: 'existing-id', name: component, url: 'immutable.vercel.app' }],
           };
         }
-        assert.ok(url.pathname.startsWith('/v4/aliases/'));
+        assert.equal(operation, 'getAlias');
         return { projectId: component, deploymentId: 'existing-id' };
       },
       { COMPONENT: component, VERCEL_PROJECT_ID: component },
@@ -97,10 +117,10 @@ for (const component of ['frontend', 'backend'])
     assert.deepEqual(context.core.secrets, []);
   });
 
-test('production lookup omits the preview branch and missing deployments require explicit bootstrap', async (t) => {
-  const context = fixture(t, ({ url }) => {
-    assert.equal(url.searchParams.get('target'), 'production');
-    assert.equal(url.searchParams.get('branch'), null);
+test('production lookup omits the preview branch and missing deployments require explicit bootstrap', async () => {
+  const context = fixture(({ params }) => {
+    assert.equal(params.target, 'production');
+    assert.equal(params.branch, undefined);
     return { deployments: [] };
   });
   await assert.rejects(
@@ -109,132 +129,186 @@ test('production lookup omits the preview branch and missing deployments require
   );
 });
 
-test('database preview selection is exact, idempotent, and follows parent pagination', async (t) => {
+test('database preview selection is exact and idempotent using the SDK paginator', async () => {
   let preview;
   let created = 0;
-  const context = fixture(
-    t,
-    ({ url, method, body }) => {
-      assert.equal(url.hostname, 'console.neon.tech');
-      if (method === 'POST') {
-        assert.deepEqual(body, {
-          branch: { name: 'preview/feature/a', parent_id: 'parent' },
-          endpoints: [{ type: 'read_write' }],
-        });
-        preview = { id: 'preview', name: body.branch.name };
-        created++;
-        return { branch: preview };
-      }
-      if (url.searchParams.has('search'))
-        return {
-          branches: [
-            { id: 'wrong', name: 'preview/feature/a-extra' },
-            ...(preview ? [preview] : []),
-          ],
-        };
-      if (!url.searchParams.has('cursor'))
-        return { branches: [{ id: 'other' }], pagination: { next: 'page-2' } };
-      assert.equal(url.searchParams.get('cursor'), 'page-2');
-      return { branches: [{ id: 'parent', default: true }] };
-    },
-    { NEON_API_KEY: 'neon-token', NEON_PROJECT_ID: 'project' },
-  );
+  const context = fixture(({ provider, operation, params }) => {
+    assert.equal(provider, 'neon');
+    assert.equal(params.projectId, 'project');
+    if (operation === 'createBranch') {
+      assert.deepEqual(params, {
+        projectId: 'project',
+        name: 'preview/feature/a',
+        parent_id: 'parent',
+      });
+      preview = { id: 'preview', name: params.name };
+      created++;
+      return preview;
+    }
+    assert.equal(operation, 'listBranches');
+    return params.search
+      ? [{ id: 'wrong', name: 'preview/feature/a-extra' }, ...(preview ? [preview] : [])]
+      : [{ id: 'parent', default: true }];
+  });
   assert.equal(await context.providers.getDatabasePreviewFor({ create: true }), 'preview');
   assert.equal(await context.providers.getDatabasePreviewFor({ create: true }), 'preview');
   assert.equal(created, 1);
 });
 
-test('migration credentials are masked and remain within the consuming job', async (t) => {
-  const core = coreMock();
-  const uri = 'postgresql://owner:password@database.test/neondb';
-  t.mock.method(globalThis, 'fetch', async (url) => {
-    assert.equal(url.pathname, '/api/v2/projects/project/connection_uri');
-    assert.equal(url.searchParams.get('branch_id'), 'preview');
-    assert.equal(url.searchParams.get('pooled'), 'false');
-    return Response.json({ uri });
-  });
-  const values = {
-    NEON_OPERATION: 'database-env',
-    NEON_PROJECT_ID: 'project',
-    NEON_API_KEY: 'key',
-    NEON_BRANCH_ID: 'preview',
-  };
-  const previous = Object.fromEntries(Object.keys(values).map((key) => [key, process.env[key]]));
-  Object.assign(process.env, values);
-  try {
-    assert.equal(await neon({ core }), undefined);
-  } finally {
-    for (const [key, value] of Object.entries(previous)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
+for (const operation of ['database-plan', 'database-branch', 'database-env'])
+  test(`inline ${operation} dispatch keeps credentials within the job`, async () => {
+    const uri = 'postgresql://owner:password@database.test/neondb';
+    const context = fixture(
+      ({ operation, params }) => {
+        if (operation === 'listBranches')
+          return [
+            { id: 'parent', default: true },
+            { id: 'preview', name: 'preview/branch' },
+          ];
+        assert.equal(operation, 'connectionString');
+        assert.equal(params.branchId, 'preview');
+        assert.equal(params.pooled, false);
+        return uri;
+      },
+      { DEPLOY_BRANCH: 'branch' },
+    );
+    const values = {
+      NEON_OPERATION: operation,
+      NEON_BRANCH_ID: 'preview',
+      PROVIDERS_MODULE: path.join(root, '.github/actions/_shared/providers.cjs'),
+    };
+    const previous = Object.fromEntries(Object.keys(values).map((key) => [key, process.env[key]]));
+    Object.assign(process.env, values);
+    try {
+      const action = await fs.readFile(
+        path.join(root, '.github/actions/neon-operation/action.yml'),
+        'utf8',
+      );
+      const script = action.match(/script: \|\n((?: {10}.+\n)+)/)[1].replace(/^ {10}/gm, '');
+      const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
+      const loadProviders = (name) => {
+        assert.equal(name, values.PROVIDERS_MODULE);
+        return {
+          createProviders: ({ core }) => {
+            assert.equal(core, context.core);
+            return context.providers;
+          },
+        };
+      };
+      assert.equal(
+        await new AsyncFunction('require', 'core', script)(loadProviders, context.core),
+        undefined,
+      );
+    } finally {
+      for (const [key, value] of Object.entries(previous)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
     }
-  }
-  assert.deepEqual(core.outputs, {});
-  assert.equal(core.variables.DATABASE_URL, uri);
-  assert.ok(core.secrets.includes(uri));
-  assert.ok(!core.logs.join('\n').includes('password'));
-});
+    assert.deepEqual(
+      context.core.outputs,
+      operation === 'database-plan'
+        ? { parent_branch_id: 'parent' }
+        : operation === 'database-branch'
+          ? { branch_id: 'preview' }
+          : {},
+    );
+    if (operation === 'database-env') {
+      assert.equal(context.core.variables.DATABASE_URL, uri);
+      assert.ok(context.core.secrets.includes(uri));
+    } else assert.deepEqual(context.core.variables, {});
+    assert.ok(!context.core.logs.join('\n').includes('password'));
+  });
 
-test('provider failures cannot disclose connection details', async (t) => {
+test('SDK failures cannot disclose connection details', async () => {
   const context = fixture(
-    t,
-    () => Response.json({ message: 'postgresql://private' }, { status: 403 }),
+    () => {
+      throw Object.assign(new Error('postgresql://private'), { status: 403 });
+    },
     { NEON_API_KEY: 'key' },
   );
-  await assert.rejects(context.providers.getDatabasePreviewFor(), /HTTP 403/);
+  await assert.rejects(context.providers.getDatabasePreviewFor(), (error) => {
+    assert.match(error.message, /HTTP 403/);
+    assert.ok(!error.message.includes('private'));
+    return true;
+  });
   assert.equal(
     context.providers.sanitize('key postgresql://owner:password@host/db'),
     '<REDACTED> <REDACTED DATABASE URL>',
   );
 });
 
-test('deployment helpers reject aliases belonging to another project', async (t) => {
-  const context = fixture(t, ({ url }) =>
-    url.pathname === '/v7/deployments'
+test('official SDKs load from the wrapper dependency directory on Node 24', async (t) => {
+  const calls = [];
+  t.mock.method(globalThis, 'fetch', async (input) => {
+    calls.push(new URL(input.url ?? input).hostname);
+    return Response.json(
+      { error: { code: 'forbidden', message: 'postgresql://private' }, message: 'private' },
+      { status: 403 },
+    );
+  });
+  const providers = createProviders({
+    core: coreMock(),
+    env: {
+      PROVIDER_DEPS_DIR: path.join(root, '.github/actions/provider-script'),
+      VERCEL_TOKEN: 'fixture-token',
+      VERCEL_ORG_ID: 'team',
+      VERCEL_PROJECT_ID: 'project',
+      DEPLOY_TARGET: 'preview',
+      DEPLOY_BRANCH: 'branch',
+      NEON_API_KEY: 'fixture-key',
+      NEON_PROJECT_ID: 'project',
+    },
+  });
+  await assert.rejects(
+    providers.getApplicationDeploymentFor(),
+    /vercel request failed \(HTTP 403\)/,
+  );
+  await assert.rejects(providers.getProductionDatabase(), /neon request failed \(HTTP 403\)/);
+  assert.deepEqual(calls, ['api.vercel.com', 'console.neon.tech']);
+});
+
+test('deployment helpers reject aliases belonging to another project', async () => {
+  const context = fixture(({ operation }) =>
+    operation === 'getDeployments'
       ? { deployments: [{ uid: 'existing', name: 'backend' }] }
       : { projectId: 'other' },
   );
   await assert.rejects(context.providers.getApplicationDeploymentFor(), /another project/);
-  assert.ok(context.calls.every(({ method }) => method === 'GET'));
+  assert.ok(context.calls.every(({ operation }) => operation.startsWith('get')));
 });
 
 for (const target of ['preview', 'production'])
-  test(`${target}: backend runtime owns its origin and selected database`, async (t) => {
+  test(`${target}: backend runtime owns its origin and selected database`, async () => {
     let frontendHost;
     const context = fixture(
-      t,
-      ({ url, method, body }) => {
-        if (url.pathname === '/v9/projects/frontend') return { name: 'frontend' };
-        if (url.pathname.startsWith('/v4/aliases/')) {
-          frontendHost = decodeURIComponent(url.pathname.split('/').pop());
-          return target === 'preview'
-            ? Response.json({}, { status: 404 })
-            : { projectId: 'frontend' };
+      ({ operation, params }) => {
+        if (operation === 'getProject') return { name: 'frontend' };
+        if (operation === 'getAlias') {
+          frontendHost = params.idOrAlias;
+          if (target === 'preview') throw { statusCode: 404 };
+          return { projectId: 'frontend' };
         }
-        if (url.pathname === '/v7/deployments') {
-          assert.equal(url.searchParams.get('target'), 'production');
+        if (operation === 'getDeployments') {
+          assert.equal(params.target, 'production');
           return { deployments: [{ uid: 'production-frontend' }] };
         }
-        if (method === 'POST') {
-          assert.equal(url.pathname, '/v2/deployments/production-frontend/aliases');
-          assert.equal(body.alias, frontendHost);
+        if (operation === 'assignAlias') {
+          assert.equal(params.id, 'production-frontend');
+          assert.equal(params.requestBody.alias, frontendHost);
           return {};
         }
-        if (url.pathname.endsWith('/branches'))
-          return {
-            branches: [
-              { id: 'parent', default: true },
-              { id: 'preview', name: 'preview/feature/a' },
-            ],
-          };
-        assert.equal(
-          url.searchParams.get('branch_id'),
-          target === 'preview' ? 'preview' : 'parent',
-        );
-        assert.equal(url.searchParams.get('pooled'), 'true');
-        return { uri: 'postgresql://private' };
+        if (operation === 'listBranches')
+          return [
+            { id: 'parent', default: true },
+            { id: 'preview', name: 'preview/feature/a' },
+          ];
+        assert.equal(operation, 'connectionString');
+        assert.equal(params.branchId, target === 'preview' ? 'preview' : 'parent');
+        assert.equal(params.pooled, true);
+        return 'postgresql://private';
       },
-      { DEPLOY_TARGET: target, NEON_API_KEY: 'key', NEON_PROJECT_ID: 'project' },
+      { DEPLOY_TARGET: target },
     );
     const runtime = await context.providers.getApplicationRuntimeFor({ application: 'backend' });
     assert.deepEqual(runtime, {
@@ -245,20 +319,19 @@ for (const target of ['preview', 'production'])
     assert.deepEqual(context.core.outputs, {});
   });
 
-test('frontend runtime uses the resolved backend and exposes no database credentials', async (t) => {
+test('frontend runtime uses the resolved backend and exposes no database credentials', async () => {
   let backendHost;
   const context = fixture(
-    t,
-    ({ url, method }) => {
-      assert.equal(url.hostname, 'api.vercel.com');
-      assert.equal(method, 'GET');
-      if (url.pathname === '/v7/deployments')
+    ({ provider, operation, params }) => {
+      assert.equal(provider, 'vercel');
+      if (operation === 'getDeployments')
         return { deployments: [{ uid: 'backend', name: 'backend' }] };
-      if (url.pathname.startsWith('/v4/aliases/')) {
-        backendHost = decodeURIComponent(url.pathname.split('/').pop());
+      if (operation === 'getAlias') {
+        backendHost = params.idOrAlias;
         return { projectId: 'backend', deploymentId: 'backend' };
       }
-      assert.equal(url.pathname, '/v9/projects/frontend');
+      assert.equal(operation, 'getProject');
+      assert.equal(params.idOrName, 'frontend');
       return { name: 'frontend' };
     },
     { VERCEL_PROJECT_ID: 'frontend' },
@@ -269,14 +342,14 @@ test('frontend runtime uses the resolved backend and exposes no database credent
   assert.deepEqual(Object.keys(runtime).sort(), ['BACKEND_URL', 'FRONTEND_URL']);
 });
 
-test('application URL stays stable across commits while publication records the new deployment', async (t) => {
+test('application URL stays stable across commits while publication records the new deployment', async () => {
   const assignments = [];
-  const context = fixture(t, ({ url, method, body }) => {
-    if (url.pathname.startsWith('/v13/deployments/')) return { id: url.pathname.split('/').pop() };
-    if (url.pathname.startsWith('/v9/projects/')) return { name: 'backend' };
-    if (url.pathname.startsWith('/v4/aliases/')) return { projectId: 'backend' };
-    assert.equal(method, 'POST');
-    assignments.push(body.alias);
+  const context = fixture(({ operation, params }) => {
+    if (operation === 'getDeployment') return { id: params.idOrUrl };
+    if (operation === 'getProject') return { name: 'backend' };
+    if (operation === 'getAlias') return { projectId: 'backend' };
+    assert.equal(operation, 'assignAlias');
+    assignments.push(params.requestBody.alias);
     return {};
   });
   const first = await context.providers.assignApplicationDeploymentFor({
@@ -384,6 +457,7 @@ test('workflows retain the ordered stack without an artifact or restore protocol
     'utf8',
   );
   assert.ok(!/upload-artifact|download-artifact|restore|actions\/checkout/.test(action));
+  assert.equal((action.match(/uses: \$\/\.github\/actions\/provider-script/g) ?? []).length, 2);
   const database = await fs.readFile(
     path.join(root, '.github/workflows/reusable-database.yml'),
     'utf8',

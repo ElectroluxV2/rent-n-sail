@@ -6,9 +6,16 @@ const os = require('node:os');
 const { execFileSync, spawnSync } = require('node:child_process');
 
 const root = path.resolve(__dirname, '../..');
-const script = path.join(root, '.github/actions/component-changes/detect.sh');
+
+async function inlineRuns(action) {
+  const text = await fs.readFile(path.join(root, `.github/actions/${action}/action.yml`), 'utf8');
+  return [...text.matchAll(/run: \|\n((?: {8}.+\n)+)/g)].map((match) =>
+    match[1].replace(/^ {8}/gm, ''),
+  );
+}
 
 test('bare Git detector compares complete commit trees without a worktree', async (t) => {
+  const [script] = await inlineRuns('component-changes');
   const directory = await fs.mkdtemp(
     path.join(process.env.RUNNER_TEMP || os.tmpdir(), 'rns-diff-'),
   );
@@ -54,7 +61,7 @@ test('bare Git detector compares complete commit trees without a worktree', asyn
     await t.test(name, async () => {
       const output = path.join(directory, 'output');
       await fs.writeFile(output, '');
-      const result = spawnSync('bash', [script], {
+      const result = spawnSync('bash', ['-c', script], {
         encoding: 'utf8',
         env: {
           ...process.env,
@@ -94,13 +101,7 @@ test('short inline CLI setup uses native tool versions and cached installation a
     '#!/usr/bin/env bash\nif [[ $1 == --version ]]; then echo 12.fixture; else printf "%s\\n" "$@" > "$CAPTURE"; fi\n',
     { mode: 0o755 },
   );
-  const action = await fs.readFile(
-    path.join(root, '.github/actions/setup-vercel-cli/action.yml'),
-    'utf8',
-  );
-  const scripts = [...action.matchAll(/run: \|\n((?: {8}.+\n)+)/g)].map((match) =>
-    match[1].replace(/^ {8}/gm, ''),
-  );
+  const scripts = await inlineRuns('setup-vercel-cli');
   assert.equal(scripts.length, 2);
   const env = {
     ...process.env,

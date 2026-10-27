@@ -1,5 +1,17 @@
 # AI usage docs
 
+## 2026-10-27 — Official provider SDKs with a cached script wrapper
+
+- AI assistance: OpenCode (GPT-6.1 Sol) followed the explicit SDK-adoption decision: removed `.github/provider-clients.md`, replaced custom fetch/pagination code with official `@vercel/sdk@1.28.53` and `@neon/sdk@7.5.0` calls, and kept the high-level provider interface and lazy client loading. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- Added `.github/actions/provider-script`, a shared wrapper around `actions/github-script` with a separate npm manifest/lockfile, platform/Node/lockfile-keyed dependency caching, credential-free `npm ci --ignore-scripts` on misses, and same-job installation reuse. No SDK bundle or application checkout is required; application setup/build/deployment still stays skipped for unchanged previews.
+- Updated provider tests to exercise SDK operation contracts and the actual installed clients, inline Neon dispatch, and cold/ready wrapper setup. Retained status-only SDK failures, alias ownership, explicit CORS, private database bindings, bare-Git comparison, and SSR packaging. No main integration or URL-identity change was made.
+- Local validation: all 28 tests pass, including actual Node 24 SDK loading, status-only SDK errors, cold-install/ready-cache wrapper execution, all inline Neon operations, and real bare-repository comparisons. Inline Bash passed ShellCheck; YAML/action-lock, formatting, and diff checks pass. Dependencies were installed from the public registry using the host's existing system certificate trust; TLS verification was not disabled.
+
+## 2026-10-27 — Inline the small action scripts
+
+- AI assistance: OpenCode (GPT-6.1 Sol) implemented the two new PR #14 review comments by inlining the bare-Git detector in `component-changes/action.yml` and the Neon dispatcher in `neon-operation/action.yml`. Replaced the dispatcher switch with an object of async handlers, and removed the redundant `detect.sh` and `neon.cjs` files. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- Updated tests to execute the actual inline YAML bodies, including all three Neon operations and their non-secret outputs/job-private migration credentials. Bare fetching, NUL-delimited paths, colored display/plain output, no-checkout reuse, and provider policy remain unchanged. No main integration or SDK/alias policy change was made.
+
 ## 2026-10-27 — Assess provider, naming, and short-Bash review comments
 
 - AI assistance: OpenCode (GPT-6.1 Sol) assessed the five latest PR #14 review threads and the clarification that short, straightforward Bash is appropriate. Restored inline native Vercel CLI setup and replaced GitHub comparison-API code with a short bare-Git/NUL-delimited diff script, without a checkout action or worktree. Authentication stays out of URLs/arguments, colored JSON remains display-only, and complete Git trees remove the 300-file API limit. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
