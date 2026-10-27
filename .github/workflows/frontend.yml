@@ -6,7 +6,7 @@ on:
         type: choice
         options: [preview, production]
         default: preview
-      build:
+      update:
         type: boolean
         default: true
 permissions:
@@ -23,5 +23,5 @@ jobs:
     with:
       branch: ${{ github.ref_name }}
       target: ${{ inputs.target }}
-      build: ${{ inputs.build }}
+      update: ${{ inputs.update }}
     secrets: inherit

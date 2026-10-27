@@ -1,5 +1,5 @@
-name: Check changed path
-description: Check whether the event's before/after diff contains a path substring.
+name: Diff component path
+description: Check whether the event's before/after diff contains a component's path substring.
 inputs:
   path:
     description: Path substring to check, for example backend/.
@@ -11,7 +11,7 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: 🔍 Check changed path
+    - name: 🔍 Diff component path
       id: detect
       shell: bash
       env:

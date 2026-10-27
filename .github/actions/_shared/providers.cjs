@@ -8,7 +8,8 @@ function serviceAlias(project, branch, target) {
   return `${project.slice(0, 42)}-preview-${digest}.vercel.app`;
 }
 
-function createProviders({ core, env = process.env }) {
+// Neon helpers say "Database", Vercel helpers say "Service"; both describe an instance as { id, address }.
+function createProviders({ core, exec, env = process.env }) {
   const branch = env.DEPLOY_BRANCH;
   const target = env.DEPLOY_TARGET;
   let neon;
@@ -38,45 +39,60 @@ function createProviders({ core, env = process.env }) {
     throw result.error;
   }
 
-  async function getProductionDatabase() {
+  async function getProductionDatabaseBranch() {
     const selected = env.NEON_PARENT_BRANCH_ID;
     const branches = await neonRequest((client) =>
       client.branches.list({ projectId: env.NEON_PROJECT_ID }).all(),
     );
-    const parent = branches.find((candidate) =>
+    const source = branches.find((candidate) =>
       selected ? candidate.id === selected || candidate.name === selected : candidate.default,
     );
-    if (!parent)
-      throw new Error('Could not resolve the production parent; configure NEON_PARENT_BRANCH_ID.');
-    core.info(`Selected production parent: ${parent.id}`);
-    return parent.id;
+    if (!source)
+      throw new Error('Could not resolve the production source; configure NEON_PARENT_BRANCH_ID.');
+    return { id: source.id, address: source.name };
   }
 
-  async function getDatabasePreviewFor({ create = false } = {}) {
-    const name = `preview/${branch}`;
+  function databaseBranchName() {
+    return `preview/${branch}`;
+  }
+
+  async function findDatabaseBranch() {
+    if (target === 'production') return getProductionDatabaseBranch();
+    const name = databaseBranchName();
     const branches = await neonRequest((client) =>
       client.branches.list({ projectId: env.NEON_PROJECT_ID, search: name }).all(),
     );
-    let preview = branches.find((candidate) => candidate.name === name);
-    if (preview) core.info(`Reusing Neon branch ${name} (${preview.id}).`);
-    else {
-      if (!create) throw new Error('Run the database workflow first to create its preview branch.');
-      const parentId = await getProductionDatabase();
-      preview = await neonRequest((client) =>
-        client.branches.create({ projectId: env.NEON_PROJECT_ID, name, parent_id: parentId }),
-      );
-      core.info(`Created Neon branch ${name} (${preview.id}).`);
-    }
-    return preview.id;
+    const found = branches.find((candidate) => candidate.name === name);
+    return found ? { id: found.id, address: name } : null;
   }
 
-  async function getDatabaseConnectionFor({ branchId, pooled }) {
-    core.info(`Resolving private database connection for ${branchId} (pooled=${pooled}).`);
+  async function forkDatabaseBranch() {
+    const source = await getProductionDatabaseBranch();
+    const name = databaseBranchName();
+    core.info(`Forking production source ${source.address} (${source.id}) as ${name}.`);
+    const { id } = await neonRequest((client) =>
+      client.branches.create({ projectId: env.NEON_PROJECT_ID, name, parent_id: source.id }),
+    );
+    return { id, address: name };
+  }
+
+  async function getDatabaseConnection(pooled) {
+    const database = await findDatabaseBranch();
+    if (!database) throw new Error('Run the database workflow first to create its preview.');
+    core.info(`Resolving the ${pooled ? 'pooled' : 'direct'} connection to ${database.address}.`);
     const uri = await neonRequest((client) =>
-      client.postgres.connectionString({ projectId: env.NEON_PROJECT_ID, branchId, pooled }),
+      client.postgres.connectionString({
+        projectId: env.NEON_PROJECT_ID,
+        branchId: database.id,
+        pooled,
+      }),
     );
     core.setSecret(uri);
     return uri;
+  }
+
+  async function getDatabaseSettings() {
+    return { DATABASE_URL: await getDatabaseConnection(false) };
   }
 
   async function latestServiceDeployment(projectId, deploymentTarget) {
@@ -101,7 +117,7 @@ function createProviders({ core, env = process.env }) {
     return alias;
   }
 
-  async function serviceHostname(projectId) {
+  async function serviceAddress(projectId) {
     const { name } = await vercelRequest(sdk.projectsGetProject, { idOrName: projectId });
     return serviceAlias(name, branch, target);
   }
@@ -113,24 +129,34 @@ function createProviders({ core, env = process.env }) {
     });
   }
 
-  async function getServiceDeploymentFor(projectId = env.VERCEL_PROJECT_ID) {
+  async function findServiceDeployment(projectId = env.VERCEL_PROJECT_ID) {
     const deployment = await latestServiceDeployment(projectId, target);
     if (!deployment) return null;
     const hostname = serviceAlias(deployment.name, branch, target);
     const alias = await ownedServiceAlias(hostname, projectId);
     return {
       id: deployment.uid,
-      url: `https://${alias?.deploymentId === deployment.uid ? hostname : deployment.url}`,
+      address: `https://${alias?.deploymentId === deployment.uid ? hostname : deployment.url}`,
     };
   }
 
-  // Redeploys production as this branch's preview with only its environment changed: no build or
+  async function pointServiceAlias(url) {
+    const { id } = await vercelRequest(sdk.deploymentsGetDeployment, {
+      idOrUrl: new URL(url).hostname,
+    });
+    const hostname = await serviceAddress(env.VERCEL_PROJECT_ID);
+    await ownedServiceAlias(hostname, env.VERCEL_PROJECT_ID);
+    await assignServiceAlias(hostname, id);
+    return { id, address: `https://${hostname}` };
+  }
+
+  // Redeploys production as this branch's preview with only its settings changed: no build or
   // file transfer. Every service is deployed from main at least once.
-  async function cloneServiceDeploymentFor(runtime) {
+  async function forkServiceDeployment(settings) {
     const production = await latestServiceDeployment(env.VERCEL_PROJECT_ID, 'production');
     if (!production)
-      throw new Error('No READY production deployment to clone; deploy it from main.');
-    core.info(`Cloning production deployment ${production.uid} for ${branch}.`);
+      throw new Error('No READY production deployment to fork; deploy it from main.');
+    core.info(`Forking production deployment ${production.uid} for ${branch}.`);
     const response = await fetch(
       `https://api.vercel.com/v13/deployments?teamId=${env.VERCEL_ORG_ID}`,
       {
@@ -145,7 +171,7 @@ function createProviders({ core, env = process.env }) {
           deploymentId: production.uid,
           name: production.name,
           project: env.VERCEL_PROJECT_ID,
-          env: runtime,
+          env: settings,
           meta: { githubDeployment: '1', githubCommitRef: branch, githubCommitSha: env.GITHUB_SHA },
         }),
       },
@@ -160,62 +186,91 @@ function createProviders({ core, env = process.env }) {
       !['READY', 'ERROR', 'CANCELED'].includes(deployment.readyState);
       attempt++
     ) {
-      if (attempt === 200) throw new Error(`Clone ${deployment.id} did not finish in 10 minutes.`);
+      if (attempt === 200) throw new Error(`Fork ${deployment.id} did not finish in 10 minutes.`);
       await new Promise((resolve) => setTimeout(resolve, 3000));
       deployment = await vercelRequest(sdk.deploymentsGetDeployment, { idOrUrl: deployment.id });
     }
     if (deployment.readyState !== 'READY')
-      throw new Error(`Clone ${deployment.id} ended ${deployment.readyState}.`);
-    return assignServiceDeploymentFor(`https://${deployment.url}`);
+      throw new Error(`Fork ${deployment.id} ended ${deployment.readyState}.`);
+    return pointServiceAlias(`https://${deployment.url}`);
   }
 
-  async function getBackendServiceRuntime() {
-    const frontendProject = env.VERCEL_FRONTEND_PROJECT_ID;
-    const hostname = await serviceHostname(frontendProject);
-    if (target === 'preview' && !(await ownedServiceAlias(hostname, frontendProject))) {
+  async function reserveServiceAlias(projectId) {
+    const hostname = await serviceAddress(projectId);
+    if (target === 'preview' && !(await ownedServiceAlias(hostname, projectId))) {
       // Reserve ownership before trusting this exact origin for CORS.
-      const production = await latestServiceDeployment(frontendProject, 'production');
+      const production = await latestServiceDeployment(projectId, 'production');
       await assignServiceAlias(hostname, production.uid);
     }
-    const branchId =
-      target === 'production' ? await getProductionDatabase() : await getDatabasePreviewFor();
+    return hostname;
+  }
+
+  async function getBackendServiceSettings() {
+    const frontend = await reserveServiceAlias(env.VERCEL_FRONTEND_PROJECT_ID);
     return {
-      CORS_ALLOWED_ORIGINS: `https://${hostname}`,
-      DATABASE_URL: await getDatabaseConnectionFor({ branchId, pooled: true }),
+      CORS_ALLOWED_ORIGINS: `https://${frontend}`,
+      DATABASE_URL: await getDatabaseConnection(true),
       // Passkey ceremonies run on the frontend origin that calls this backend.
-      WEBAUTHN_ORIGIN: `https://${hostname}`,
-      WEBAUTHN_RP_ID: hostname,
+      WEBAUTHN_ORIGIN: `https://${frontend}`,
+      WEBAUTHN_RP_ID: frontend,
     };
   }
 
-  async function getFrontendServiceRuntime() {
-    const backend = await getServiceDeploymentFor(env.VERCEL_BACKEND_PROJECT_ID);
+  async function getFrontendServiceSettings() {
+    const backend = await findServiceDeployment(env.VERCEL_BACKEND_PROJECT_ID);
     if (!backend) throw new Error('Run the backend workflow first to deploy its preview.');
     return {
-      BACKEND_URL: backend.url,
-      FRONTEND_URL: `https://${await serviceHostname(env.VERCEL_FRONTEND_PROJECT_ID)}`,
+      BACKEND_URL: backend.address,
+      FRONTEND_URL: `https://${await serviceAddress(env.VERCEL_FRONTEND_PROJECT_ID)}`,
     };
   }
 
-  async function assignServiceDeploymentFor(url) {
-    const { id } = await vercelRequest(sdk.deploymentsGetDeployment, {
-      idOrUrl: new URL(url).hostname,
-    });
-    const hostname = await serviceHostname(env.VERCEL_PROJECT_ID);
-    await ownedServiceAlias(hostname, env.VERCEL_PROJECT_ID);
-    await assignServiceAlias(hostname, id);
-    return { id, url: `https://${hostname}` };
+  async function vercelCli(args) {
+    if (env.VERCEL_LOCAL_CONFIG) args.push('--local-config', env.VERCEL_LOCAL_CONFIG);
+    const { stdout } = await exec.getExecOutput('vercel', args, { env });
+    return stdout.trim();
+  }
+
+  async function pullServiceConfig() {
+    const args = ['pull', '--yes', '--environment', target];
+    if (target === 'preview') args.push('--git-branch', branch);
+    await vercelCli(args);
+  }
+
+  async function buildServiceOutput() {
+    await vercelCli(['build', '--environment', target]);
+  }
+
+  async function publishServiceDeployment(settingNames) {
+    const args = [
+      'deploy',
+      '--prebuilt',
+      '--environment',
+      target,
+      '--meta',
+      'githubDeployment=1',
+      '--meta',
+      `githubCommitRef=${branch}`,
+      '--meta',
+      `githubCommitSha=${env.GITHUB_SHA}`,
+    ];
+    // Valueless --env reads each setting from the job environment, keeping values out of arguments.
+    for (const name of settingNames) args.push('--env', name);
+    // The CLI waits for READY.
+    return pointServiceAlias(await vercelCli(args));
   }
 
   return {
-    getProductionDatabase,
-    getDatabasePreviewFor,
-    getDatabaseConnectionFor,
-    getServiceDeploymentFor,
-    cloneServiceDeploymentFor,
-    getBackendServiceRuntime,
-    getFrontendServiceRuntime,
-    assignServiceDeploymentFor,
+    findDatabaseBranch,
+    forkDatabaseBranch,
+    getDatabaseSettings,
+    findServiceDeployment,
+    forkServiceDeployment,
+    getBackendServiceSettings,
+    getFrontendServiceSettings,
+    pullServiceConfig,
+    buildServiceOutput,
+    publishServiceDeployment,
   };
 }
 

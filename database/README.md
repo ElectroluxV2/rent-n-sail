@@ -20,6 +20,6 @@ uv run alembic upgrade head
 
 Review generated migrations before committing them. Production migrations should be backward compatible with the previous application version; the deployment pipeline does not automatically downgrade a database when an application deployment fails.
 
-The reusable database workflow prepares an isolated copy-on-write Neon preview, applies pending migrations on every run, and uses `neondatabase/schema-diff-action` to comment the schema difference against the production parent on the PR. See [repository setup](../.github/CI.md#repository-setup) for the token and project variables.
+The reusable database workflow ensures an isolated copy-on-write Neon preview, forked from the production source. When `database/` changes, or a manual run's `update` checkbox is set, it releases the update with `alembic upgrade head` and uses `neondatabase/schema-diff-action` to comment the schema difference against the preview's parent on the PR. See [repository setup](../.github/CI.md#repository-setup) for the token and project variables.
 
-The preview workflow executes Alembic migrations on Postgres on every run. An offline Postgres SQL rendering can be checked with `uv run alembic upgrade head --sql` and a Postgres `DATABASE_URL`.
+Every update runs the Alembic migrations against Postgres. An offline Postgres SQL rendering can be checked with `uv run alembic upgrade head --sql` and a Postgres `DATABASE_URL`.

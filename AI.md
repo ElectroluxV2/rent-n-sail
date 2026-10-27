@@ -1,5 +1,21 @@
 # AI usage docs
 
+## 2026-10-27 — Unified component workflow implemented
+
+- AI assistance: OpenCode (Claude Opus 5.5) implemented `.github/COMPONENT-WORKFLOW.md` with the user's review names and answers: `BUILD_NEEDED`, 🧭 Choose strategy, 🚀 Release update, and "production source". The output stays `instance_id`, because production runs have no preview. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+  - **Same steps everywhere:** all three reusable workflows run 🔍 Detect changes, 🧭 Choose strategy, 🌱 Ensure instance, the update stages, and 📝 Report instance with the same names. They take an `update` input; `database.yml` gained the checkbox.
+  - **One action:** `component-instance` replaces `neon-operation` and `vercel-prebuilt-deploy`. Its operations (`ensure`, `pull`, `package`, `settings`, `release`, `report`) call generic names that each component maps to Neon "Database" or Vercel "Service" helpers in `providers.cjs`. Instances are `{ id, address }`; state passes between steps as `INSTANCE_*` job variables.
+  - **Fork rule (Q1):** applications build directly, so only an unchanged application without a preview is forked. The database still forks before migrating.
+  - **Summary:** one format for every component and for failed operations; no application PR comments.
+  - **Placement:** ⚙️ Set up Vercel CLI stays after the quality gates, because its `pnpm/setup` exports its own `PNPM_HOME` first on `PATH`.
+  - **Docs:** `CI.md` and `database/README.md` use the new vocabulary, and `CI.md` now says "forked repositories" for pull requests from forks.
+- Validation: actionlint with ShellCheck, oxfmt, `gh actions-lock` (all 7 workflows valid, lockfile unchanged), and mermaid-cli rendering of all three diagrams passed. A throwaway script ran the operations against a fake SDK, `fetch`, and `exec` and passed nine scenarios:
+  - database reuse, fork+update, and a production update;
+  - backend reuse, and a fork with all four settings and no `target`;
+  - a backend update without a preview, which skips the fork;
+  - a frontend update that packages and releases;
+  - a frontend without a backend preview, and a production without a deployment, which both fail with the unified summary.
+
 ## 2026-10-27 — Proposed unified component-workflow terminology
 
 - AI assistance: OpenCode (Claude Opus 5.5) delegated the user's request to a subagent, which wrote `.github/COMPONENT-WORKFLOW.md`. It contains an inventory of today's names and a proposed vocabulary shared by all components (instance, address, version, fork, update, release, settings), along with proposed step and helper names. It also includes mermaid diagrams of the proposed generic flow and of today's application and database flows, a comparison, and open questions. Nothing is implemented yet. OpenCode reviewed the document, and the subagent rendered all three diagrams with mermaid-cli. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).

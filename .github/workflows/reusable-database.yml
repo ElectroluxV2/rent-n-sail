@@ -8,7 +8,7 @@ on:
       target:
         type: string
         default: ""
-      build:
+      update:
         type: boolean
         default: false
     secrets:
@@ -17,9 +17,12 @@ on:
       NEON_PROJECT_ID:
         required: false
     outputs:
-      branch_id:
-        description: Non-secret Neon branch reference; credentials never cross job outputs.
-        value: ${{ jobs.database.outputs.branch_id }}
+      instance_id:
+        value: ${{ jobs.database.outputs.instance_id }}
+      address:
+        value: ${{ jobs.database.outputs.address }}
+      result:
+        value: ${{ jobs.database.outputs.result }}
 permissions:
   contents: read
   pull-requests: write
@@ -30,62 +33,45 @@ jobs:
     environment:
       name: database-${{ case(inputs.target == 'production' || (inputs.target == '' && github.event_name == 'push'), 'production', inputs.branch || github.head_ref || github.ref_name) }}
     outputs:
-      branch_id: ${{ steps.reference.outputs.branch_id }}
+      instance_id: ${{ steps.report.outputs.instance_id }}
+      address: ${{ steps.report.outputs.address }}
+      result: ${{ steps.report.outputs.result }}
     env:
+      COMPONENT: database
       DEPLOY_BRANCH: ${{ inputs.branch || github.head_ref || github.ref_name }}
       DEPLOY_TARGET: ${{ case(inputs.target != '', inputs.target, github.event_name == 'push', 'production', 'preview') }}
       NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID || secrets.NEON_PROJECT_ID }}
       NEON_PARENT_BRANCH_ID: ${{ vars.NEON_PARENT_BRANCH_ID }}
     steps:
-      - name: 🔍 Check database changes
+      - name: 🔍 Detect changes
         id: changes
         uses: $/.github/actions/component-changes
         with:
           path: database/
-      - name: 🧭 Select migration path
+      - name: 🧭 Choose strategy
         uses: actions/github-script@v9.0.0
         env:
-          BUILD: ${{ inputs.build || steps.changes.outputs.changed == 'true' }}
+          BUILD_NEEDED: ${{ inputs.update || steps.changes.outputs.changed == 'true' }}
         with:
           # language=javascript
           script: |
-            const build = process.env.BUILD === 'true';
-            core.info(build ? 'Migration path: install migration tools and apply pending migrations.' : 'No database changes: skip migration tools and leave the schema untouched.');
-            core.exportVariable('BUILD_REQUESTED', String(build));
-      - name: 🌱 Ensure preview branch
-        id: branch
-        if: env.DEPLOY_TARGET == 'preview'
+            const { BUILD_NEEDED, COMPONENT } = process.env;
+            core.info(BUILD_NEEDED === 'true' ? `Update: validate and release the ${COMPONENT}.` : `No ${COMPONENT} changes: reuse its instance, or fork one.`);
+            core.exportVariable('BUILD_NEEDED', BUILD_NEEDED);
+      - name: 🌱 Ensure instance
+        uses: $/.github/actions/component-instance
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-        uses: $/.github/actions/neon-operation
         with:
-          operation: database-branch
-      - name: 🔗 Resolve production parent
-        id: plan
-        if: env.DEPLOY_TARGET == 'production' || env.BUILD_REQUESTED == 'true'
-        env:
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-        uses: $/.github/actions/neon-operation
-        with:
-          operation: database-plan
-      - name: 🧭 Select database reference
-        id: reference
-        uses: actions/github-script@v9.0.0
-        env:
-          NEON_BRANCH_ID: ${{ env.DEPLOY_TARGET == 'preview' && steps.branch.outputs.branch_id || steps.plan.outputs.parent_branch_id }}
-        with:
-          # language=javascript
-          script: |
-            core.info(`Selected ${process.env.DEPLOY_TARGET} database branch: ${process.env.NEON_BRANCH_ID}`);
-            core.setOutput('branch_id', process.env.NEON_BRANCH_ID);
-      - name: 📥 Checkout migration source
-        if: env.BUILD_REQUESTED == 'true'
+          operation: ensure
+      - name: 📥 Check out source
+        if: env.BUILD_NEEDED == 'true'
         uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
       - name: ⚙️ Set up uv and Python
         uses: astral-sh/setup-uv@v10.3.2
-        if: env.BUILD_REQUESTED == 'true'
+        if: env.BUILD_NEEDED == 'true'
         env:
           # The project venv gets a managed Python 3.14; later uv commands reuse that venv.
           UV_PYTHON_PREFERENCE: only-managed
@@ -94,36 +80,31 @@ jobs:
           enable-cache: true
           cache-python: true
           activate-environment: true
-      - name: 📦 Install migration tools
-        if: env.BUILD_REQUESTED == 'true'
+      - name: 📦 Install dependencies
+        if: env.BUILD_NEEDED == 'true'
         # language=bash
         run: uv sync --directory database --locked
-      - name: 🔐 Resolve migration credentials
-        if: env.BUILD_REQUESTED == 'true'
+      - name: 🔐 Resolve settings
+        if: env.BUILD_NEEDED == 'true'
+        uses: $/.github/actions/component-instance
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          NEON_BRANCH_ID: ${{ steps.reference.outputs.branch_id }}
-        uses: $/.github/actions/neon-operation
         with:
-          operation: database-env
-      - name: 🚀 Apply migrations
-        if: env.BUILD_REQUESTED == 'true'
+          operation: settings
+      - name: 🚀 Release update
+        if: env.BUILD_NEEDED == 'true'
         # language=bash
         run: uv run --directory database --locked alembic upgrade head
       - name: 📝 Comment schema changes
-        if: env.BUILD_REQUESTED == 'true' && github.event_name == 'pull_request' && env.DEPLOY_TARGET == 'preview'
+        if: env.BUILD_NEEDED == 'true' && github.event_name == 'pull_request' && env.DEPLOY_TARGET == 'preview'
         uses: neondatabase/schema-diff-action@v1.0.1
         with:
           api_key: ${{ secrets.NEON_API_KEY }}
           project_id: ${{ env.NEON_PROJECT_ID }}
-          base_branch: ${{ steps.plan.outputs.parent_branch_id }}
-          compare_branch: ${{ steps.reference.outputs.branch_id }}
-      - name: 📝 Write deployment summary
-        uses: actions/github-script@v9.0.0
-        env:
-          NEON_BRANCH_ID: ${{ steps.reference.outputs.branch_id }}
+          # The base defaults to the preview's parent: the production source it was forked from.
+          compare_branch: ${{ env.INSTANCE_ID }}
+      - name: 📝 Report instance
+        id: report
+        uses: $/.github/actions/component-instance
         with:
-          # language=javascript
-          script: |
-            const migrations = process.env.BUILD_REQUESTED === 'true' ? 'Alembic upgrade head completed (pending revisions only).' : 'skipped (no database changes).';
-            await core.summary.addHeading('Database deployment').addRaw(`Neon branch: ${process.env.NEON_BRANCH_ID}\nMigrations: ${migrations}`, true).write();
+          operation: report

@@ -1,0 +1,29 @@
+name: Component instance
+description: Run one stage of the generic component flow; only the provider helpers behind it differ per component.
+inputs:
+  operation:
+    description: ensure, pull, package, settings, release, or report.
+    required: true
+outputs:
+  instance_id:
+    description: Set by report. Provider ID of the instance the run ended on, a Neon branch or a Vercel deployment.
+    value: ${{ steps.operation.outputs.instance_id }}
+  address:
+    description: Set by report. The instance's stable address, a Neon branch name or an https:// alias.
+    value: ${{ steps.operation.outputs.address }}
+  result:
+    description: Set by report. reuse, fork, update, or fork+update.
+    value: ${{ steps.operation.outputs.result }}
+runs:
+  using: composite
+  steps:
+    - name: 🌱 Run instance operation
+      id: operation
+      uses: actions/github-script@v9.0.0
+      env:
+        INSTANCE_OPERATION: ${{ inputs.operation }}
+        CI_SCRIPT: ${{ github.action_path }}/instance.cjs
+      with:
+        # language=javascript
+        script: |
+          await require(process.env.CI_SCRIPT)({ core, exec });
