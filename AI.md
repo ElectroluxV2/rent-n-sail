@@ -1,5 +1,9 @@
 # AI usage docs
 
+## 2026-10-27 — Dropped the vendored SDK license notices
+
+- AI assistance: OpenCode (Claude Opus 5.5) removed `.github/actions/_shared/vendor/dist/THIRD_PARTY_NOTICES.txt` at the user's request. `build.mjs` now only writes the bundle, without esbuild's metafile or the license-file scan, and `.github/CI.md` no longer mentions the notices. The rebuilt `dist/sdk.cjs` is byte-identical. Because the bundle is minified with `legalComments: 'none'`, the repository no longer includes the Apache-2.0/MIT license texts of the bundled `@neon/sdk`, `@vercel/sdk`, and `zod`. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
 ## 2026-10-27 — Vendored SDK output moved to `dist/`
 
 - AI assistance: OpenCode (Claude Opus 5.5) restructured `.github/actions/_shared/vendor` at the user's request. Generated output now lives in `dist/` (`dist/sdk.cjs`, `dist/THIRD_PARTY_NOTICES.txt`), replacing the earlier `src/` directory. The hand-written `build.mjs` and `sdk.mjs` moved back to the vendor root next to the pnpm project files. `build.mjs` writes to `dist/` and no longer takes an output-directory argument, which only the removed drift test used. `providers.cjs` loads `./vendor/dist/sdk.cjs`, and `.gitattributes` marks `vendor/dist/**` as generated. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
