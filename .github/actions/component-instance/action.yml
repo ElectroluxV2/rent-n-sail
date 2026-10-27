@@ -1,18 +1,38 @@
 name: Component instance
-description: Run one stage of the generic component flow; only the provider helpers behind it differ per component.
+description: >-
+  Run one stage of the generic component flow (.github/COMPONENT-WORKFLOW.md) for the job's COMPONENT
+  (database, backend, or frontend), DEPLOY_TARGET (preview or production), and DEPLOY_BRANCH. The stage calls
+  generic helpers that each component maps to its provider: Neon "Database" helpers for the database and Vercel
+  "Service" helpers for the backend and frontend. State reaches later steps through INSTANCE_* job variables,
+  and a failed stage writes its error to the job summary.
 inputs:
   operation:
-    description: ensure, pull, package, settings, release, or report.
+    description: |
+      Stage to run. Every component uses ensure, settings, and report; pull, package, and release are only for the
+      backend and frontend, because the database releases its update with Alembic.
+      - ensure: find the instance for the target and Git branch, and record its ID and address. A missing preview
+        is forked from the production source with the branch's settings, unless an update follows on a versioned
+        provider (Vercel), whose release creates it. Neon branches are always forked first, because migrations
+        change them in place.
+      - pull: download the Vercel project configuration and environment for the target with `vercel pull`.
+      - package: produce the version's Vercel Build Output: `vercel build` for the backend, or the frontend's
+        already validated Angular SSR build, laid out without building again.
+      - settings: resolve the target's settings (database URL, CORS and WebAuthn origins, backend and frontend
+        URLs), export them to the job environment with database URLs masked, and list their names in
+        INSTANCE_SETTINGS.
+      - release: deploy the packaged version with `vercel deploy --prebuilt`, bind those settings as deployment
+        environment variables, and point the branch's alias at the new version.
+      - report: set the instance_id, address, and result outputs, log one line, and write the job summary.
     required: true
 outputs:
   instance_id:
-    description: Set by report. Provider ID of the instance the run ended on, a Neon branch or a Vercel deployment.
+    description: Set by report. Provider ID of the instance the job ended on, a Neon branch (br-…) or a Vercel deployment (dpl_…).
     value: ${{ steps.operation.outputs.instance_id }}
   address:
-    description: Set by report. The instance's stable address, a Neon branch name or an https:// alias.
+    description: Set by report. The instance's stable address, which survives updates and forks; a Neon branch name or an https:// alias.
     value: ${{ steps.operation.outputs.address }}
   result:
-    description: Set by report. reuse, fork, update, or fork+update.
+    description: Set by report. What the job did with the instance; reuse, fork, update, or fork+update.
     value: ${{ steps.operation.outputs.result }}
 runs:
   using: composite

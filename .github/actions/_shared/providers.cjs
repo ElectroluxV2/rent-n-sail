@@ -223,12 +223,11 @@ function createProviders({ core, exec, env = process.env }) {
     if (!backend) throw new Error('Run the backend workflow first to deploy its preview.');
     return {
       BACKEND_URL: backend.address,
-      FRONTEND_URL: `https://${await serviceAddress(env.VERCEL_FRONTEND_PROJECT_ID)}`,
+      FRONTEND_URL: `https://${await serviceAddress(env.VERCEL_PROJECT_ID)}`,
     };
   }
 
   async function vercelCli(args) {
-    if (env.VERCEL_LOCAL_CONFIG) args.push('--local-config', env.VERCEL_LOCAL_CONFIG);
     const { stdout } = await exec.getExecOutput('vercel', args, { env });
     return stdout.trim();
   }

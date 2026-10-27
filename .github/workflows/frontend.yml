@@ -21,7 +21,6 @@ jobs:
     name: 🌐 Frontend
     uses: $/.github/workflows/reusable-frontend.yml
     with:
-      branch: ${{ github.ref_name }}
       target: ${{ inputs.target }}
       update: ${{ inputs.update }}
     secrets: inherit

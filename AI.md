@@ -1,5 +1,19 @@
 # AI usage docs
 
+## 2026-10-27 — Review: one decision step, two environments, no frontend vercel.json
+
+- AI assistance: OpenCode (Claude Opus 5.5) implemented six new PR #14 review threads. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+  - **One decision step:** `component-changes` takes the manual `update` override, logs whether the path changed and whether an update was requested, and exports the resulting `BUILD_NEEDED`. 🧭 Choose strategy, its log line, and the unused `changed` output are gone.
+  - **Environments:** every job deploys to the GitHub environment named after its target, `preview` or `production`. `stack.yml` passes the target and the reusable workflows require it. The `branch` input is gone, because every caller passed `github.head_ref || github.ref_name` anyway.
+  - **Job environment:** `COMPONENT` stays job-wide, because every `component-instance` call reads it. The backend job no longer sets the unused `VERCEL_BACKEND_PROJECT_ID`, and the frontend job reads its own address from `VERCEL_PROJECT_ID`.
+  - **Descriptions:** `component-instance` and `component-changes` describe the action, every operation, and every output in full.
+  - **`frontend/vercel.json`:** deleted, along with `VERCEL_LOCAL_CONFIG`. Its empty `buildCommand` was left over from when the frontend ran `vercel build`. `vercel deploy --prebuilt` never builds on Vercel, and no Vercel Git integration deploys this repository. `CI.md` names the proper switch, `git.deploymentEnabled: false`, in case one is ever connected.
+- Validation: these checks passed:
+  - actionlint, and ShellCheck on the detect script;
+  - all four `BUILD_NEEDED` combinations;
+  - the nine-scenario check, which now asserts that no CLI call gets `--local-config`;
+  - mermaid-cli rendering of all three diagrams.
+
 ## 2026-10-27 — Frontend packaging moved into providers.cjs
 
 - AI assistance: OpenCode (Claude Opus 5.5) answered why `component-instance/output.cjs` existed. It lays the already-built Angular SSR output out in Vercel's Build Output API format. The pinned Vercel CLI's Angular preset deploys only static browser output (`dist/<app>/browser` with an `/index.html` fallback), and the runtime `BACKEND_URL` reaches the browser only through SSR, so the code stays. The separate file was a leftover of `vercel-prebuilt-deploy`: the code is now `packageFrontendServiceOutput` in `providers.cjs`, next to the other Vercel helpers, and `output.cjs` is deleted. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
