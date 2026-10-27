@@ -45,7 +45,6 @@ jobs:
       VERCEL_BACKEND_PROJECT_ID: ${{ vars.VERCEL_BACKEND_PROJECT_ID }}
       VERCEL_FRONTEND_PROJECT_ID: ${{ vars.VERCEL_FRONTEND_PROJECT_ID }}
       VERCEL_PROJECT_ID: ${{ vars.VERCEL_BACKEND_PROJECT_ID }}
-      VERCEL_LOCAL_CONFIG: vercel.json
       UV_PYTHON_PREFERENCE: only-managed
     steps:
       - name: 🔍 Check backend changes

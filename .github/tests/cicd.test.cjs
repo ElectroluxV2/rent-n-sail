@@ -376,6 +376,32 @@ test('package/build subprocesses do not receive github-script action inputs', ()
   assert.deepEqual(buildEnvironment(env), { VERCEL_TOKEN: 'vercel', PUBLIC: 'public' });
 });
 
+test('frontend project settings retain their explicit Vercel config', async () => {
+  const core = coreMock();
+  const env = {
+    VERCEL_LOCAL_CONFIG: 'frontend/vercel.json',
+    DEPLOY_TARGET: 'preview',
+    DEPLOY_BRANCH: 'branch',
+  };
+  const exec = {
+    async getExecOutput(program, args) {
+      assert.equal(program, 'vercel');
+      assert.deepEqual(args, [
+        'pull',
+        '--yes',
+        '--environment',
+        'preview',
+        '--git-branch',
+        'branch',
+        '--local-config',
+        'frontend/vercel.json',
+      ]);
+      return { exitCode: 0, stdout: '', stderr: '' };
+    },
+  };
+  await deploy.pull({ core, env, exec, providers: { sanitize: (text) => text } });
+});
+
 test('frontend packaging keeps CSR templates private and uses validated SSR/browser output', async (t) => {
   const directory = await temporary(t);
   const dist = path.join(directory, 'dist');
@@ -409,7 +435,6 @@ test('publication binds private runtime configuration, not command-line secret v
     const core = coreMock();
     const env = {
       COMPONENT: 'backend',
-      VERCEL_LOCAL_CONFIG: 'vercel.json',
       DEPLOY_BRANCH: 'branch',
       DEPLOY_TARGET: 'preview',
       GITHUB_SHA: 'sha',
@@ -426,6 +451,7 @@ test('publication binds private runtime configuration, not command-line secret v
       async getExecOutput(program, args, options) {
         assert.equal(program, 'vercel');
         assert.ok(args.includes('--prebuilt') && args.includes('DATABASE_URL'));
+        assert.ok(!args.includes('--local-config'));
         assert.ok(!args.join(' ').includes('postgresql://'));
         assert.equal(options.env.DATABASE_URL, 'postgresql://private');
         return {

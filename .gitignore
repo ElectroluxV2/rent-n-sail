@@ -15,7 +15,6 @@ __pycache__/
 /frontend/out-tsc
 /frontend/bazel-out
 /frontend/node_modules
-/.github/actions/provider-script/node_modules/
 /frontend/**/npm-debug.log
 /frontend/**/yarn-error.log
 
@@ -45,6 +44,9 @@ __pycache__/
 /frontend/**/testem.log
 /frontend/typings
 /frontend/**/__screenshots__/
+
+# Local CI tooling dependencies
+/.github/actions/provider-script/node_modules/
 
 # System files
 .DS_Store

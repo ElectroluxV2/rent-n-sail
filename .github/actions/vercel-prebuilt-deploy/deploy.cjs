@@ -18,6 +18,7 @@ async function report({ core, env }, mode, { id, url }) {
 }
 
 async function vercel({ core, exec, env, providers }, args, bindings = env) {
+  if (env.VERCEL_LOCAL_CONFIG) args.push('--local-config', env.VERCEL_LOCAL_CONFIG);
   const result = await command(exec, 'vercel', args, { env: bindings, allowFailure: true });
   core.info(providers.sanitize(result.stdout));
   core.info(providers.sanitize(result.stderr));
@@ -31,14 +32,7 @@ async function reuse(context) {
 
 async function pull(context) {
   const { env } = context;
-  const args = [
-    'pull',
-    '--local-config',
-    env.VERCEL_LOCAL_CONFIG,
-    '--yes',
-    '--environment',
-    env.DEPLOY_TARGET,
-  ];
+  const args = ['pull', '--yes', '--environment', env.DEPLOY_TARGET];
   if (env.DEPLOY_TARGET === 'preview') args.push('--git-branch', env.DEPLOY_BRANCH);
   await vercel(context, args);
 }
@@ -53,11 +47,7 @@ async function build(context) {
     for (const name of await fs.readdir('.vercel')) {
       if (name.startsWith('.env.')) await fs.writeFile(path.join('.vercel', name), '');
     }
-    await vercel(
-      context,
-      ['build', '--local-config', env.VERCEL_LOCAL_CONFIG, '--environment', env.DEPLOY_TARGET],
-      buildEnvironment(env),
-    );
+    await vercel(context, ['build', '--environment', env.DEPLOY_TARGET], buildEnvironment(env));
   }
 }
 
@@ -68,8 +58,6 @@ async function publish(context) {
   const args = [
     'deploy',
     '--prebuilt',
-    '--local-config',
-    env.VERCEL_LOCAL_CONFIG,
     '--environment',
     env.DEPLOY_TARGET,
     '--meta',
