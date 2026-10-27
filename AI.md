@@ -1,5 +1,9 @@
 # AI usage docs
 
+## 2026-10-27 — Why pnpm/setup cannot cache action-owned lockfiles
+
+- AI assistance: OpenCode (GPT-6.1 Sol) explained from pnpm/setup v3.1.1 source and its bundled `@actions/glob` code that the store cache key is the lockfile's `hashFiles` digest, which skips files outside `GITHUB_WORKSPACE`. Action snapshots live outside the workspace, so the digest is empty and `cache: true` throws. No code was changed. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
 ## 2026-10-27 — pnpm-owned CI tooling and simpler change detection
 
 - AI assistance: OpenCode (GPT-6.1 Sol) implemented the five new PR #14 review threads. Removed the change detector's cleanup trap and generated temporary directory, relying on the runner's per-job temporary directory, and replaced `base64 | tr` with `base64 -w0`. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
