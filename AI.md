@@ -1,5 +1,12 @@
 # AI usage docs
 
+## 2026-10-27 — Vercel CLI versus SDK-only deployment
+
+- AI assistance: OpenCode (Claude Opus 5.5) assessed whether `@vercel/sdk` could replace the Vercel CLI and recommended keeping the CLI in build jobs. Reuse runs, deployment lookup, alias assignment, and Neon operations already use only the SDKs. The CLI remains for `vercel build` (backend) and `vercel deploy --prebuilt` (both applications), with `vercel pull` feeding them. No code was changed. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- Backend build: a retained `vercel build` output contained `functions/fastapi.func` with the application source, a 99 MB `_vendor` (3,170 files, including CPython 3.14 x86_64 extension modules) with `vercel_runtime` 0.24.1, and a generated 43-line `vc__handler__python.py`. That handler configures `vercel_runtime` through private `__VC_HANDLER_*` environment variables, so replacing the builder means maintaining a copy of a private builder/runtime contract.
+- Publishing: Vercel CLI 65.2.0 creates prebuilt deployments with a `?prebuilt=1` query parameter. Vercel's public OpenAPI does not define it, and the generated SDK's `createDeployment` accepts only the `forceNew`, `skipAutoDetectionConfirmation`, `teamId`, and `slug` query parameters. SDK-only publishing would need raw HTTP for that flag, our own file hashing and retrying uploads, and READY polling.
+- The only documented SDK-only route is uploading source for a remote Vercel build. It moves the backend build from CI to Vercel, and per-deployment secrets would move into project environment variables because the public deployment API has no per-deployment environment. Each alternative adds more code than the CLI install saves (4–6.5s, build jobs only).
+
 ## 2026-10-27 — Vercel CLI caching status
 
 - AI assistance: OpenCode (GPT-6.1 Sol) answered that the Vercel CLI is no longer cached: build jobs install it through `pnpm/setup` from the action-owned lockfile, while reuse runs skip it. Compared logged step durations: 4.1–6.5s uncached versus 4.7s for the former `actions/cache` path, because pnpm and Node are downloaded either way. No code was changed. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
