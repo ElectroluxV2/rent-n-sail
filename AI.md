@@ -3,7 +3,7 @@
 ## 2026-10-27 — Prepare European hosting resources
 
 - AI assistance: Junie (gpt-6-luna) inspected the GitHub, Vercel, and Neon configuration; provisioned Vercel projects `rent-n-sail-backend-eu` and `rent-n-sail-frontend-eu`, and Neon project `rent-n-sail-db-eu` in Frankfurt (`aws-eu-central-1`). Vercel’s Neon Marketplace integration was required because the only Neon organization is Vercel-managed. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
-- The new projects are staged with the repository’s backend/frontend roots and the Neon resource connected to the new backend. The existing Neon production branch had no application tables. GitHub deployment IDs have not yet been switched, no production pipeline has been run, and legacy projects have not been deleted pending the deployment cutover.
+- The new projects are configured with the repository’s backend/frontend roots and `fra1` function-region settings; the Neon resource is connected to the new backend. GitHub now references the new project IDs. The new frontend was deployed from local source to production to seed its stable alias, temporarily pointing at the new backend alias; the first `stack.yml` preview then passed database and backend jobs but failed frontend formatting, which was corrected. The final full preview and production backend/database rollout are pending, and old projects remain intact.
 
 ## 2026-10-27 — Unit-test the backend API URL interceptor
 
