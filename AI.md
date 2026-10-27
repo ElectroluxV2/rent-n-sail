@@ -1,5 +1,9 @@
 # AI usage docs
 
+## 2026-10-27 — Proposed unified component-workflow terminology
+
+- AI assistance: OpenCode (Claude Opus 5.5) delegated the user's request to a subagent, which wrote `.github/COMPONENT-WORKFLOW.md`. It contains an inventory of today's names and a proposed vocabulary shared by all components (instance, address, version, fork, update, release, settings), along with proposed step and helper names. It also includes mermaid diagrams of the proposed generic flow and of today's application and database flows, a comparison, and open questions. Nothing is implemented yet. OpenCode reviewed the document, and the subagent rendered all three diagrams with mermaid-cli. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
 ## 2026-10-27 — Settings only in deployment env; production clones for new branches
 
 - AI assistance: OpenCode (Claude Opus 5.5) replaced the reuse-production fallback, which the user rejected.
