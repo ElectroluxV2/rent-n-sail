@@ -1,5 +1,13 @@
 # AI usage docs
 
+## 2026-10-27 — Removed old environments, deployments, and runs
+
+- AI assistance: OpenCode (Claude Opus 5.5) cleaned up the repository with the user's approval. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+  - **Environments:** deleted the five per-branch GitHub environments (`backend-cd`, `backend-preview-14`, `database-cd`, `frontend-cd`, `frontend-preview-14`), none of which had secrets, variables, or rules. Only `preview` remains.
+  - **Deployments:** deleted their 154 deployment records, which GitHub keeps after an environment is deleted. Each was marked inactive first, because only inactive deployments can be deleted.
+  - **Runs:** deleted PR #14's 98 older workflow runs on `cd` and `clone-check`, including every run of the removed `automatic.yml`. The two runs of `9f1b092` and the runs from teammates' merged branches remain, as the user chose.
+  - Run IDs cited in earlier entries no longer resolve.
+
 ## 2026-10-27 — Review: one decision step, two environments, no frontend vercel.json
 
 - AI assistance: OpenCode (Claude Opus 5.5) implemented six new PR #14 review threads. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
