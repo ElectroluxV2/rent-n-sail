@@ -1,9 +1,13 @@
 # AI usage docs
 
+## 2026-10-27 — Removed the local CI tooling tests
+
+- AI assistance: OpenCode (Claude Opus 5.5) removed all four local Node tests under `.github/tests` at the user's request: `cicd.test.cjs`, `component-changes.test.cjs`, `provider-sdk-bundle.test.cjs`, and `setup-vercel-cli.test.cjs`. It also dropped their mentions from `.github/CI.md`: the note on local regression tests, the SDK bundle's rebuild check, and the vendor install and `node --test` verification commands. The backend pytest command and the ShellCheck guidance remain. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
 ## 2026-10-27 — Skip database tooling when `database/` is unchanged
 
 - AI assistance: OpenCode (Claude Opus 5.5) delegated the user's request to a subagent after run `40522812270` installed uv and the migration tools, applied migrations, and posted a schema diff for a docs-only commit. Commit `1aa6019` had dropped the database build gate, so nothing read the detector's `changed` output. `reusable-database.yml` now exports `BUILD_REQUESTED` with the same expression as the application workflows: detected `database/` changes, PR `opened`/`reopened`, or the `build` input. Checkout, uv/Python, the migration tools, migration credentials, `alembic upgrade head`, and the schema-diff comment run only when it is true. Preview branch preparation still runs, because backend publication only looks the branch up; the production-parent lookup runs only for production or migrations. Manual `database.yml` runs always migrate (`build: true`). Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
-- Validation: OpenCode reviewed the diff; actionlint, the 33 CI tooling tests, and action-lock verification pass.
+- Validation: OpenCode reviewed the diff; actionlint, the 33 CI tooling tests, and action-lock verification pass. On the live stack run `40527252285` (commit `baabbf3`, no `database/` changes), the database job took 11s instead of 21–24s. It ensured the preview branch, skipped the parent lookup, checkout, uv, migration tools, credentials, migrations, and schema-diff comment, and the whole stack finished in 36s.
 
 ## 2026-10-27 — Cross-origin passkey requests with AuthTuna on SQLite
 

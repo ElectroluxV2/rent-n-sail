@@ -28,11 +28,11 @@ Every configured workflow/composite step has an explicit emoji-prefixed name. Th
 - 🧹 lint; 🎨 formatting; 🧪 tests; 🔨 builds.
 - 🚀 publication/migrations; 📝 reports; ❌ failures.
 
-Selection and resource-resolution steps log their decisions: full build/migration versus reuse, preview branch creation/reuse, selected production parent/database reference, and chosen deployment IDs/URLs. Private connection values and tokens are not printed. `.cjs` modules live beside their action definitions; shared provider/command helpers are in `.github/actions/_shared`. Actions expressions reach JavaScript through environment variables, never interpolated into executable code. Module calls do not return credential-bearing values to github-script's automatic result output. Package/build subprocesses do not receive github-script token inputs. Regression tests run locally with Node's built-in test runner, not as an extra workflow step.
+Selection and resource-resolution steps log their decisions: full build/migration versus reuse, preview branch creation/reuse, selected production parent/database reference, and chosen deployment IDs/URLs. Private connection values and tokens are not printed. `.cjs` modules live beside their action definitions; shared provider/command helpers are in `.github/actions/_shared`. Actions expressions reach JavaScript through environment variables, never interpolated into executable code. Module calls do not return credential-bearing values to github-script's automatic result output. Package/build subprocesses do not receive github-script token inputs.
 
 Provider callers use high-level helpers such as `getDatabasePreviewFor`, `getApplicationDeploymentFor`, and `getApplicationRuntimeFor`, implemented with the official `@neon/sdk` client and `@vercel/sdk`'s tree-shakable standalone functions. The SDKs own HTTP transport and pagination; the helpers retain exact branch selection, alias ownership, and credential masking. Clients are loaded lazily, so frontend/reuse operations do not require Neon credentials.
 
-The SDKs are not installed at run time. `.github/actions/_shared/vendor` pins them (and esbuild) with a pnpm lockfile, and `pnpm run build` bundles them into the checked-in `vendor/sdk.cjs` (about 270 KB) plus `THIRD_PARTY_NOTICES.txt` with each bundled package's license. The hand-written sources live in `vendor/src/`; the generated `sdk.cjs` and `THIRD_PARTY_NOTICES.txt` stay at the vendor root. Provider steps call `actions/github-script` directly and `require` that bundle, so they need no install, cache, or registry access. After changing SDK versions, run `pnpm install` and `pnpm run build` in that directory and commit both generated files; a local test fails if they differ from a rebuild.
+The SDKs are not installed at run time. `.github/actions/_shared/vendor` pins them (and esbuild) with a pnpm lockfile, and `pnpm run build` bundles them into the checked-in `vendor/sdk.cjs` (about 270 KB) plus `THIRD_PARTY_NOTICES.txt` with each bundled package's license. The hand-written sources live in `vendor/src/`; the generated `sdk.cjs` and `THIRD_PARTY_NOTICES.txt` stay at the vendor root. Provider steps call `actions/github-script` directly and `require` that bundle, so they need no install, cache, or registry access. After changing SDK versions, run `pnpm install` and `pnpm run build` in that directory and commit both generated files.
 
 `.github/actions/setup-vercel-cli` contains its own `package.json`, pinned `pnpm-lock.yaml`, and pnpm version. It runs `pnpm/setup` with its action directory as `working-directory` and `require-lockfile: true`, so the CLI comes from the action snapshot rather than `frontend/` or any (possibly sparse) checkout, and the action receives no provider/database credentials. Hosted runners ship Node.js, so the action installs only pnpm and the CLI, which runs on the `node` already on PATH. Only the frontend build installs Node.js, because it must restore the exact version locked by `frontend/package.json`. The CLI is not bundled like the SDKs: it loads deployment builders such as `@vercel/python` from its installed packages at run time. On Linux it runs as JavaScript, so its `pnpm-workspace.yaml` skips optional dependencies (platform binaries, including a 58.6 MB native CLI build) and denies esbuild's install script.
 
@@ -85,9 +85,7 @@ Jobs have no fork-PR skip condition. Fork PRs still do not receive repository se
 ## Verification
 
 ```bash
-pnpm --dir .github/actions/_shared/vendor install --frozen-lockfile
-node --test .github/tests/*.test.cjs
 uv run --directory backend --locked pytest -q
 ```
 
-The local tests execute the actual inline YAML scripts. Validate inline Bash with ShellCheck as part of workflow linting.
+Validate inline Bash with ShellCheck as part of workflow linting.
