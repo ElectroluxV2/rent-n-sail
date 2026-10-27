@@ -1,5 +1,9 @@
 # AI usage docs
 
+## 2026-10-27 — Trimmed pnpm Vercel CLI without a cache
+
+- AI assistance: OpenCode (Claude Opus 5.5) measured the user's simpler alternative to the cached npm setup. `setup-vercel-cli` uses pnpm again, without a dependency cache. It has no `devEngines.runtime` (the CLI runs on the runner's Node.js) and sets `optional: false`, `allowBuilds: esbuild: false`, and `trustLockfile: true`. The regenerated lockfile has no Node runtime entry. A local frozen install added 270 packages, none of them optional platform binaries; it ran no install scripts and skipped lockfile verification, and `vercel --version` reported 65.2.0. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
 ## 2026-10-27 — Cached npm Vercel CLI on the runner's Node.js; trusted pnpm lockfiles
 
 - AI assistance: OpenCode (Claude Opus 5.5) implemented the user's approved changes. `setup-vercel-cli` no longer uses pnpm. It pins `vercel@65.2.0` in an npm `package-lock.json`, generated against the public registry with `--before` set one day back to match pnpm's default release-age delay. It runs on the runner's preinstalled Node.js and npm, installs with `npm ci --omit=optional --ignore-scripts`, and caches the installed CLI with `actions/cache` under a key hashed from the action and its lockfile. The frontend keeps pnpm and still installs the exact Node.js version locked by `frontend/package.json`. `frontend/` and the SDK bundle set `trustLockfile: true`. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).

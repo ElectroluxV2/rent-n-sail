@@ -3,5 +3,6 @@
   "private": true,
   "dependencies": {
     "vercel": "65.2.0"
-  }
+  },
+  "packageManager": "pnpm@12.15.0"
 }
