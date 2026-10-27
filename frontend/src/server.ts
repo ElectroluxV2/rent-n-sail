@@ -15,6 +15,7 @@ const browserDistFolder = join(import.meta.dirname, '../browser');
 const app = express();
 const portlessUrl = process.env['PORTLESS_URL'];
 const frontendUrl = process.env['FRONTEND_URL'] ?? DEFAULT_FRONTEND_URL;
+const canonicalFrontendUrl = new URL(portlessUrl ?? frontendUrl);
 const backendOrigin = new URL(process.env['BACKEND_URL'] ?? DEFAULT_BACKEND_URL).origin;
 // Vercel provides these deployment domains at runtime, without a URL scheme:
 // https://vercel.com/docs/environment-variables/system-environment-variables
@@ -27,6 +28,14 @@ const allowedHosts = [
   portlessUrl ? new URL(portlessUrl).hostname : undefined,
 ].filter((host): host is string => Boolean(host));
 const angularApp = new AngularNodeAppEngine({ allowedHosts });
+
+app.use((req, res, next) => {
+  if (req.hostname !== canonicalFrontendUrl.hostname) {
+    res.redirect(308, new URL(req.originalUrl, canonicalFrontendUrl).toString());
+    return;
+  }
+  next();
+});
 
 /**
  * Forward the browser's API calls to the backend, so they stay on this origin and its cookies stay

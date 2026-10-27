@@ -1,5 +1,26 @@
 # AI usage docs
 
+## 2026-10-27 — Canonicalize frontend host for WebAuthn
+
+- AI assistance: Junie (gpt-6-luna) traced the RP ID mismatch to the production frontend being reachable through `rent-n-sail-frontend-eu.vercel.app` while passkey options use `rent-n-sail.vercel.app`. The SSR server now redirects alternate hosts to the configured `FRONTEND_URL` (or `PORTLESS_URL` locally), keeping browser origins aligned with the backend's WebAuthn RP ID and origin. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- Live verification confirmed both aliases returned `rpId: rent-n-sail.vercel.app`; only `rent-n-sail.vercel.app` matches that RP ID. No tests were added, per project guidelines.
+
+## 2026-10-27 — Make preview deployments public and restore SSR backend requests
+
+- AI assistance: Junie (gpt-6-luna) diagnosed the preview SSR failure and disabled Vercel Authentication on the `rent-n-sail` frontend and `rent-n-sail-backend` projects. It was the only configured preview protection; password and trusted-IP protections were already unset, and production protection was not changed. Verified anonymous preview requests return HTTP 200 and SSR renders `Backend says: World`. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-27 — Delete obsolete GitHub deployment objects
+
+- AI assistance: Junie (gpt-6-luna) marked inactive and deleted 45 superseded deployment objects from the GitHub Deployments API, retaining the latest `database-preview`, `backend-preview`, and `frontend-preview` deployments for `9738e99`. Verified only those three objects remain. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-27 — Delete remaining `cd` branch workflow runs
+
+- AI assistance: Junie (gpt-6-luna) deleted the two remaining completed GitHub Actions runs on PR #14's `cd` branch (backend and frontend validations at head `9738e99`). Confirmed the branch now has no workflow runs. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-27 — Clean PR workflow history and run standalone components
+
+- AI assistance: Junie (gpt-6-luna) deleted the 18 completed GitHub Actions runs associated with PR #14's `cd` branch, preserved the active `database-preview`, `backend-preview`, and `frontend-preview` environments, and ran the standalone backend and frontend workflows against head `9738e99`. Both completed successfully. The database manual workflow is not registered on the repository's default branch and could not be dispatched; the stack workflow was intentionally not run. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
 ## 2026-10-27 — Clarify component deployment environment names
 
 - AI assistance: Junie (gpt-6-luna) renamed the component-specific GitHub deployment environments to `database-preview`/`database-production`, `backend-preview`/`backend-production`, and `frontend-preview`/`frontend-production`; deployment targets remain `preview`/`production`. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
