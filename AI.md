@@ -1,5 +1,10 @@
 # AI usage docs
 
+## 2026-10-27 — Cached npm Vercel CLI on the runner's Node.js; trusted pnpm lockfiles
+
+- AI assistance: OpenCode (Claude Opus 5.5) implemented the user's approved changes. `setup-vercel-cli` no longer uses pnpm. It pins `vercel@65.2.0` in an npm `package-lock.json`, generated against the public registry with `--before` set one day back to match pnpm's default release-age delay. It runs on the runner's preinstalled Node.js and npm, installs with `npm ci --omit=optional --ignore-scripts`, and caches the installed CLI with `actions/cache` under a key hashed from the action and its lockfile. The frontend keeps pnpm and still installs the exact Node.js version locked by `frontend/package.json`. `frontend/` and the SDK bundle set `trustLockfile: true`. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- Verified locally that omitting optional dependencies is safe for our commands. The CLI loads its keyring binding and esbuild lazily, and the Node builders' bindings (`rolldown`, `oxc-*`) are not loaded for Python. With a bogus token, `vercel pull` and `vercel deploy --prebuilt` reached Vercel's API, and a backend `vercel build` produced `functions/fastapi.func` (Python 3.14, x86_64). The install is 279 packages (159 MB, or 20.4 MB as a zstd archive). Frozen pnpm installs pass without the supply-chain verification pass. All 33 tests, actionlint, ShellCheck, and action-lock verification pass.
+
 ## 2026-10-27 — Hand-written vendored SDK sources moved to `src/`
 
 - AI assistance: OpenCode (Claude Opus 5.5) delegated the user's request to a subagent, which moved the hand-written `build.mjs` and `sdk.mjs` into `.github/actions/_shared/vendor/src/`. The generated `sdk.cjs` and `THIRD_PARTY_NOTICES.txt` stay at the vendor root next to the pnpm project files, so `providers.cjs` still loads `./vendor/sdk.cjs` and `.gitattributes` is unchanged. The build script path, drift test, a code comment, and `.github/CI.md` were updated. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
