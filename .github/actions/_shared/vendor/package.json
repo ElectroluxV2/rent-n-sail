@@ -2,7 +2,7 @@
   "name": "rent-n-sail-provider-sdks",
   "private": true,
   "scripts": {
-    "build": "node build.mjs"
+    "build": "node src/build.mjs"
   },
   "dependencies": {
     "@neon/sdk": "7.5.0",

@@ -1,5 +1,10 @@
 # AI usage docs
 
+## 2026-10-27 — Hand-written vendored SDK sources moved to `src/`
+
+- AI assistance: OpenCode (Claude Opus 5.5) delegated the user's request to a subagent, which moved the hand-written `build.mjs` and `sdk.mjs` into `.github/actions/_shared/vendor/src/`. The generated `sdk.cjs` and `THIRD_PARTY_NOTICES.txt` stay at the vendor root next to the pnpm project files, so `providers.cjs` still loads `./vendor/sdk.cjs` and `.gitattributes` is unchanged. The build script path, drift test, a code comment, and `.github/CI.md` were updated. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- Validation: OpenCode reviewed the diff and re-ran the checks. `sdk.mjs` and `THIRD_PARTY_NOTICES.txt` are byte-identical, the rebuilt `sdk.cjs` differs only in its banner line, and all 33 local tests pass.
+
 ## 2026-10-27 — Fastest Vercel CLI installation on hosted runners
 
 - AI assistance: OpenCode (Claude Opus 5.5) broke down the Vercel CLI setup step in backend build `40506480402` and frontend build `40506509172`. It takes 4.1–6.4s: 0.75–1.0s to download pnpm, 1.1–2.4s to download Node 24 (58 MB) for `devEngines.runtime`, and 2.1–2.8s to install the CLI, including the 58.6 MB `@vercel/vc-native-linux-x64` binary. A 1.5s lockfile verification runs alongside the downloads. No code was changed. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).

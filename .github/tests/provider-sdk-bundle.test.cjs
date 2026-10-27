@@ -22,7 +22,7 @@ test('the checked-in SDK bundle and notices match a rebuild from the lockfile', 
     );
   });
   const output = await temporary(t, 'rns-sdk-build-');
-  execFileSync(process.execPath, [path.join(vendor, 'build.mjs'), output]);
+  execFileSync(process.execPath, [path.join(vendor, 'src/build.mjs'), output]);
   for (const file of ['sdk.cjs', 'THIRD_PARTY_NOTICES.txt'])
     assert.equal(
       await fs.readFile(path.join(output, file), 'utf8'),
