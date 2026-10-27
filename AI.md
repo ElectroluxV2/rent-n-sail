@@ -9,6 +9,7 @@
   - **Production today:** it still runs main's earlier code (backend only at `/api/*`, frontend alias 404), so clones work only once this pipeline has deployed both services from main.
   - Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
 - Validation: with an injected fake SDK, an existing preview was reused. A missing preview produced one redeploy request (`deploymentId`, no `target`, the four backend settings, and branch metadata), was polled to READY, and received the branch alias. A frontend without a backend preview asked for the backend workflow first.
+- Live validation: signed, GitHub-Verified commit `56be01e` passed stack run `40537936546`, backend build `40537969121`, and frontend build `40537989478`. With settings only in deployment env, SSR rendered the backend response through `BACKEND_URL`, `/boats` read `DATABASE_URL`, and CORS allowed exactly the frontend origin with credentials. A one-off check on the throwaway branch `clone-check` (run `40538465213`, branch deleted afterwards) redeployed the cd backend preview with a different CORS origin. The clone was READY in 20s as a preview with no aliases; it allowed the overridden origin and not the source's. With `DATABASE_URL` left out of the override, `/boats` returned 500, so clones always send every setting. The clone was deleted.
 
 ## 2026-10-27 — Review round: one provider module, change-only builds
 
