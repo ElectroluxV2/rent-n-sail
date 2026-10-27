@@ -1,5 +1,13 @@
 # AI usage docs
 
+## 2026-10-27 — Assess provider, naming, and short-Bash review comments
+
+- AI assistance: OpenCode (GPT-6.1 Sol) assessed the five latest PR #14 review threads and the clarification that short, straightforward Bash is appropriate. Restored inline native Vercel CLI setup and replaced GitHub comparison-API code with a short bare-Git/NUL-delimited diff script, without a checkout action or worktree. Authentication stays out of URLs/arguments, colored JSON remains display-only, and complete Git trees remove the 300-file API limit. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- Assessed commit-only aliases against selective deployment: changing backend URLs per SHA would strand unchanged frontend runtime bindings, while changing frontend origins would require extra backend CORS publications. Preserved the existing branch-stable aliases rather than breaking no-op reuse or adding alias-rebinding machinery.
+- Investigated first-party provider clients and a high-level provider interface, with cited findings recorded under `.github`. No merge/rebase of newer `main` was started.
+- A background research agent checked official SDK/package sources; the final assessment in `.github/provider-clients.md` records that `@vercel/sdk` and `@neon/sdk` exist, but require package installation or prebundling to run from downloaded composite snapshots. Kept native fetch private and replaced the generic public `Providers` methods with workflow-level helpers; deployment callers no longer handle REST paths, response shapes, alias reservation, or database-selection policy. Added exact-name Neon selection with documented API pagination.
+- Validation: 24 local tests pass, including the actual short Bash setup scripts, real bare-repository rename/newline/large-diff cases, provider policy, private credentials, SSR packaging, and ordered workflows. ShellCheck, actionlint (existing modern-syntax/runner-label exceptions), action-lock, and diff checks pass. An authenticated bare fetch against the real GitHub repository also returned the expected change flag and removed its temporary repository without checking out source or exposing credentials.
+
 ## 2026-10-27 — Simplify deployment reuse and remove artifact machinery
 
 - AI assistance: OpenCode (GPT-6.1 Sol) followed the request to preserve normal CI/CD behavior while reducing orchestration complexity. Removed the GitHub artifact upload/download/restore protocol, archive safety/retention/provenance machinery, private state files, Python output materialization, repeated mode plumbing, and custom provider retry/error wrappers. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).

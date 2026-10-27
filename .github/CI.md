@@ -2,9 +2,11 @@
 
 ## Entry points
 
-`stack.yml` contains exactly three ordered calls: database → backend → frontend. CI/CD orchestration is JavaScript executed by `actions/github-script@v9.0.0`; there are no Bash/Python controllers. JavaScript modules live beside their composite definitions and use the injected GitHub client, workflow context, Actions core, and exec toolkit. Native application build/test/migration commands remain normal tool invocations.
+`stack.yml` contains exactly three ordered calls: database → backend → frontend. Provider orchestration uses JavaScript executed by `actions/github-script@v9.0.0`. Short, straight-line CLI tasks stay in Bash: version/cache setup, package installation, and bare-Git comparison. There are no Python controllers. Scripts live beside their composite definitions; native application build/test/migration commands remain normal tool invocations.
 
-Each reusable workflow calls `.github/actions/component-changes` once, with only `path: database/`, `backend/`, or `frontend/`. The action reads `before`/`after` from the injected event context, fetches GitHub comparison metadata with its pre-authenticated client, and performs substring matching in JavaScript. No Git command or checkout runs in the detector. The event supplies SHAs, not file lists; GitHub's API supplies the changed filenames, including previous names for renames. Logs show the searched substring, JSON-escaped changed paths with forced `jq -C` colors, and match result. jq is used only to display colored JSON, not to orchestrate the workflow. Data used for matching/output remains uncolored. At GitHub's 300-file cap, the action logs the limit and returns `changed=true` for any requested path, since further matching files may have been truncated. Below the cap, actual paths decide the result. Missing SHAs, API errors, and non-forward comparisons still fail rather than silently meaning "unchanged".
+Each reusable workflow calls `.github/actions/component-changes` once, with only `path: database/`, `backend/`, or `frontend/`. The action initializes a temporary bare repository and performs a shallow, blobless fetch of the event's `before`/`after` commits. `git diff --name-only --no-renames -z` compares their complete trees: both sides of renames are included, and filenames remain NUL-delimited until jq encodes them. No checkout action or worktree is used. Git authentication stays in the process environment rather than a URL, argument, or persisted credential config. The temporary repository is removed on exit.
+
+Logs show the searched substring, escaped changed paths with forced `jq -C` colors, and the plain boolean match. Matching uses the uncolored JSON. There is no GitHub comparison API or 300-file cap: large diffs use their actual paths rather than forcing unrelated applications to build. Git failures fail the step instead of reporting "unchanged".
 
 Callers invoke detection for pushes and PR `synchronize` events. Initial PR `opened`/`reopened` events explicitly run full application validation/builds; manual application runs use their existing build checkbox. These choices are outside the detector. Application build decisions use only the latest push, not the cumulative PR diff. Shared CI-only or documentation changes do not implicitly rebuild applications. Database change detection is informational: the database job always applies pending migrations.
 
@@ -27,6 +29,8 @@ Every configured workflow/composite step has an explicit emoji-prefixed name. Th
 - 🚀 publication/migrations; 📝 reports; ❌ failures.
 
 Selection and resource-resolution steps log their decisions: full build/migration versus reuse, preview branch creation/reuse, selected production parent/database reference, and chosen deployment IDs/URLs. Private connection values and tokens are not printed. `.cjs` modules live beside their action definitions; shared provider/command helpers are in `.github/actions/_shared`. Actions expressions reach JavaScript through environment variables, never interpolated into executable code. Module calls do not return credential-bearing values to github-script's automatic result output. Package/build subprocesses do not receive github-script token inputs. Regression tests run locally with Node's built-in test runner, not as an extra workflow step.
+
+Provider callers use high-level helpers such as `getDatabasePreviewFor`, `getApplicationDeploymentFor`, and `getApplicationRuntimeFor`. HTTP routes, response shapes, pagination, alias ownership, and credential masking are private implementation details. Official Vercel/Neon SDKs and an OpenAPI client were assessed in [provider-clients.md](provider-clients.md); native fetch avoids extra runtime installation or a checked-in SDK distribution build.
 
 ## Repository setup
 
@@ -58,7 +62,7 @@ Compilation does not load the private environment downloaded by `vercel pull`. P
 
 ## URLs and runtime configuration
 
-Each preview uses stable, project-and-branch-specific aliases. Before granting CORS access for a new backend publication, the frontend origin is reserved/ownership-checked; on first reservation the alias temporarily points at the existing production frontend until the preview is published. This is a provider hostname reservation, not a call to frontend CI or a frontend build/deployment. Reuse-only runs do not alter aliases. Wait for the entire stack run to be green before using it. Existing aliases are never taken from another project.
+Each preview uses stable, project-and-branch-specific aliases. A commit SHA alone cannot replace this routing identity: a backend-only push must not change the frontend's existing backend URL, and an unchanged frontend must not need a new deployment or CORS origin. Vercel's immutable deployment URL and recorded Git metadata already identify individual builds. Before granting CORS access for a new backend publication, the frontend origin is reserved/ownership-checked; on first reservation the alias temporarily points at the existing production frontend until the preview is published. This is a provider hostname reservation, not a call to frontend CI or a frontend build/deployment. Reuse-only runs do not alter aliases. Wait for the entire stack run to be green before using it. Existing aliases are never taken from another project.
 
 The backend exposes `/`, `/health`, and `/boats` directly, without an `/api` prefix, and allows exactly the corresponding stable frontend origin. Open that stable URL from the GitHub Environment; an arbitrary deployment hostname is not implicitly trusted. The composable `provideBackendApiUrl` provider transfers the runtime backend URL from SSR to the browser. There is no runtime-config endpoint or preload request. Local development defaults to the explicit Portless backend/frontend origins without an environment file; deployment runtime bindings override those defaults.
 
@@ -71,6 +75,7 @@ Jobs have no fork-PR skip condition. Fork PRs still do not receive repository se
 ## Verification
 
 ```bash
-node --test .github/tests/cicd.test.cjs
+node --test .github/tests/*.test.cjs
+shellcheck .github/actions/component-changes/detect.sh
 uv run --directory backend --locked pytest -q
 ```

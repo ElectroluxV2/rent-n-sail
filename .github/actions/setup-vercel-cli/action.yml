@@ -16,14 +16,12 @@ runs:
 
     - name: ⚙️ Prepare Vercel CLI cache
       id: vercel_cli
-      uses: actions/github-script@v9.0.0
-      env:
-        CLI_OPERATION: prepare
-        CI_SCRIPT: ${{ github.action_path }}/setup.cjs
-      with:
-        # language=javascript
-        script: |
-          await require(process.env.CI_SCRIPT)({ core, exec });
+      shell: bash
+      # language=bash
+      run: |
+        echo "node-version=$(node --version)" >> "$GITHUB_OUTPUT"
+        echo "pnpm-version=$(pnpm --version)" >> "$GITHUB_OUTPUT"
+        echo "$RUNNER_TOOL_CACHE/vercel-cli/node_modules/.bin" >> "$GITHUB_PATH"
 
     - name: 📥 Restore Vercel CLI cache
       id: vercel_cli_cache
@@ -34,15 +32,16 @@ runs:
 
     - name: 📦 Install Vercel CLI
       if: steps.vercel_cli_cache.outputs.cache-hit != 'true'
-      uses: actions/github-script@v9.0.0
+      shell: bash
       env:
-        CLI_OPERATION: install
         VERCEL_CLI_VERSION: ${{ inputs.version }}
-        CI_SCRIPT: ${{ github.action_path }}/setup.cjs
-      with:
-        # language=javascript
-        script: |
-          await require(process.env.CI_SCRIPT)({ core, exec });
+      # language=bash
+      run: |
+        mkdir -p "$RUNNER_TOOL_CACHE/vercel-cli"
+        pnpm --dir "$RUNNER_TOOL_CACHE/vercel-cli" add --save-exact --allow-build=esbuild \
+          --store-dir "$RUNNER_TEMP/vercel-cli-store" --config.virtual-store-type=project \
+          "vercel@$VERCEL_CLI_VERSION"
+        vercel --version
 
     - name: 📤 Save Vercel CLI cache
       if: steps.vercel_cli_cache.outputs.cache-hit != 'true'
