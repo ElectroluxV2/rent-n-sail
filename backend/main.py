@@ -7,7 +7,7 @@ from authtuna import init_app, init_settings
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from scalar_fastapi import add_scalar_reference
-from sqlalchemy import select
+from sqlalchemy import Engine, event, select
 from sqlalchemy.orm import Session
 
 from database import get_session
@@ -36,6 +36,13 @@ init_settings(
 
 from auth.login.router import router as login_router  # noqa: I001, E402
 from auth.register.router import router as register_router  # noqa: I001, E402
+from authtuna.core import database as authtuna_database  # noqa: E402
+
+# AuthTuna attaches its SQLite PRAGMA listener to every SQLAlchemy engine, which breaks
+# Postgres connections such as /boats; keep it on AuthTuna's own engine.
+if sqlite_pragma := getattr(authtuna_database, "set_sqlite_pragma", None):
+    event.remove(Engine, "connect", sqlite_pragma)
+    event.listen(authtuna_database.engine.sync_engine, "connect", sqlite_pragma)
 
 api_router = APIRouter()
 DEFAULT_FRONTEND_ORIGIN = "https://frontend.localhost"

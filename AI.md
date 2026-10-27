@@ -1,5 +1,10 @@
 # AI usage docs
 
+## 2026-10-27 — Stack timing after merging main; `/boats` fix
+
+- AI assistance: OpenCode (Claude Opus 5.5) ran `stack.yml` through PR #14 after merging main. Run `40520812604` passed in 4m18s: database 22s, backend 180s, and frontend 46s, with about 3s between jobs. The backend's publish took 150s because Vercel installed the new AuthTuna dependencies from scratch. A follow-up backend build (`40521689277`) published in 23.7s, and its job took 52s. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- The deployed `/boats` returned 500 after the merge. A local Postgres container reproduced it: with its default SQLite database, AuthTuna registers its `PRAGMA foreign_keys=ON` listener on every SQLAlchemy engine, so psycopg connections failed. `backend/main.py` now moves that listener to AuthTuna's own engine. Locally, `/boats` then returned 200, and Ruff and the 9 backend tests pass.
+
 ## 2026-10-27 — Merged main's passkey flow and unit tests into the CI/CD branch
 
 - AI assistance: OpenCode (Claude Opus 5.5) merged `main` (`d6f0219` passkey flow, `5ef8492` unit-test steps) into `cd` with the user's approval, so PR #14 can run `stack.yml`. This branch's manual entry-point workflows are kept, and their reusable workflows already run pytest and the Angular tests. The root `vercel.json` stays deleted, and the frontend keeps its runtime backend URL provider. `backend/main.py` combines this branch's app factory, CORS allowlist, and `/`, `/health`, and `/boats` routes with main's AuthTuna settings, session middleware, Scalar reference, and passkey routers, mounted without `/api`. `scalar-fastapi` moved to runtime dependencies because Vercel's Python builder runs `uv sync --no-dev`. The re-locked `uv.lock` keeps every version pinned by either side. The connectivity check stays on `/` (`Hello`), and the passkey component resolves endpoints against the backend URL without a double slash. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
