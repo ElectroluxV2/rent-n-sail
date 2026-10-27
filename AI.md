@@ -1,5 +1,12 @@
 # AI usage docs
 
+## 2026-10-27 — Fastest Vercel CLI installation on hosted runners
+
+- AI assistance: OpenCode (Claude Opus 5.5) broke down the Vercel CLI setup step in backend build `40506480402` and frontend build `40506509172`. It takes 4.1–6.4s: 0.75–1.0s to download pnpm, 1.1–2.4s to download Node 24 (58 MB) for `devEngines.runtime`, and 2.1–2.8s to install the CLI, including the 58.6 MB `@vercel/vc-native-linux-x64` binary. A 1.5s lockfile verification runs alongside the downloads. No code was changed. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- The ubuntu-26.04 image (20261012.163) has Node.js 24.21.0 but no Vercel CLI. Every CLI command ran as `Vercel CLI 65.2.0 (Node.js 24.22.1)`: the Linux native binary is used only after an opt-in, and automatic enrollment (`isVercelianFromLoadedTeams`) applies only to Vercel employees.
+- Recommended removing `devEngines.runtime` and adding `ignoredOptionalDependencies: ["@vercel/vc-native-*"]` (estimated 2.5–3s). A local trial regenerated the lockfile with only the eight native packages and the Node runtime removed (377 → 368 entries), installed it frozen, and ran the CLI on Node. The trimmed install measured 186 MB, or 32.6 MB as a zstd archive.
+- The fastest option is restoring that trimmed install from `actions/cache` and skipping pnpm on hits (estimated ~1s), at the cost of reintroducing cache steps. Rejected `trustLockfile` (pnpm advises against it when outside contributors can edit the lockfile), npm (it cannot skip only the native binary and lacks pnpm's supply-chain checks), downloading the native binary directly (Linux opt-in; builders would install outside the lockfile), and custom images (paid larger runners only).
+
 ## 2026-10-27 — Vercel CLI versus SDK-only deployment
 
 - AI assistance: OpenCode (Claude Opus 5.5) assessed whether `@vercel/sdk` could replace the Vercel CLI and recommended keeping the CLI in build jobs. Reuse runs, deployment lookup, alias assignment, and Neon operations already use only the SDKs. The CLI remains for `vercel build` (backend) and `vercel deploy --prebuilt` (both applications), with `vercel pull` feeding them. No code was changed. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
