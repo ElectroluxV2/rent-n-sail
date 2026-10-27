@@ -246,7 +246,10 @@ function createProviders({ core, exec, env = process.env }) {
   // the already validated Angular build: https://vercel.com/docs/build-output-api
   async function packageFrontendServiceOutput() {
     const dist = 'frontend/dist/frontend';
-    await fs.cp('frontend/vercel-output', '.vercel/output', { recursive: true });
+    await fs.cp('frontend/vercel-output', '.vercel/output', {
+      recursive: true,
+      filter: (source) => path.basename(source) !== 'README.md',
+    });
     await fs.cp(dist, '.vercel/output/functions/ssr.func', { recursive: true });
     await fs.cp(path.join(dist, 'browser'), '.vercel/output/static', {
       recursive: true,

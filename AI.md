@@ -1,5 +1,16 @@
 # AI usage docs
 
+## 2026-10-27 — Secure session cookies and a README for the Vercel output
+
+- AI assistance: OpenCode (Claude Opus 5.5) made both backend cookies Secure, HttpOnly, and SameSite=Lax at the user's request. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+  - **`session_token` (AuthTuna):** `SESSION_SECURE=True` and `SESSION_SAME_SITE="lax"`.
+  - **`session` (Starlette):** this cookie holds the passkey challenge. `init_app` always adds its middleware without Secure, so `create_app` now adds AuthTuna's two middlewares itself, with `https_only=True`.
+  - **README:** added `frontend/vercel-output/README.md`, which explains the Build Output files and how `.vercel/output` is assembled. Packaging leaves the README out of the deployed output.
+- Validation: these checks passed:
+  - backend ruff, formatting, and the 9 tests;
+  - a local passkey begin, which set `session=…; httponly; samesite=lax; secure`;
+  - the ten-scenario check, which now also asserts that the README isn't deployed.
+
 ## 2026-10-27 — Review: stable aliases, committed Vercel config, docs, and cookie revert
 
 - AI assistance: OpenCode (Claude Opus 5.5) implemented ten PR #14 review threads. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).

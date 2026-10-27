@@ -4,12 +4,13 @@ from pathlib import Path
 from typing import Annotated
 
 import uvicorn
-from authtuna import init_app, init_settings
+from authtuna import init_settings
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from scalar_fastapi import add_scalar_reference
 from sqlalchemy import Engine, event, select
 from sqlalchemy.orm import Session
+from starlette.middleware.sessions import SessionMiddleware
 
 from database import get_session
 from models import Boat
@@ -21,7 +22,7 @@ if not os.access(auth_database.parent, os.W_OK):
     # Vercel functions have a read-only filesystem; each instance keeps its file in /tmp.
     auth_database = Path(tempfile.gettempdir(), auth_database.name)
 
-init_settings(
+auth_settings = init_settings(
     API_BASE_URL=os.getenv("API_BASE_URL", "http://localhost:8000"),
     DEFAULT_DATABASE_URI=os.getenv(
         "DEFAULT_DATABASE_URI", f"sqlite+aiosqlite:///{auth_database}"
@@ -32,7 +33,8 @@ init_settings(
     FERNET_KEYS=os.getenv(
         "FERNET_KEYS", ["MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA="]
     ),
-    SESSION_SECURE=False,
+    SESSION_SAME_SITE="lax",
+    SESSION_SECURE=True,
     MFA_ENABLED=False,
     PASSKEYS_ENABLED=True,
     UI_ENABLED=False,
@@ -44,6 +46,7 @@ init_settings(
 from auth.login.router import router as login_router  # noqa: I001, E402
 from auth.register.router import router as register_router  # noqa: I001, E402
 from authtuna.core import database as authtuna_database  # noqa: E402
+from authtuna.middlewares import DatabaseSessionMiddleware  # noqa: E402
 
 # AuthTuna attaches its SQLite PRAGMA listener to every SQLAlchemy engine, which breaks
 # Postgres connections such as /boats; keep it on AuthTuna's own engine.
@@ -78,7 +81,14 @@ api_router.include_router(login_router, prefix="/login")
 
 def create_app():
     app = FastAPI()
-    init_app(app)
+    # The middlewares authtuna.init_app adds, but its session cookie is Secure too.
+    app.add_middleware(DatabaseSessionMiddleware)
+    app.add_middleware(
+        SessionMiddleware,
+        secret_key=auth_settings.ENCRYPTION_PRIMARY_KEY.get_secret_value(),
+        same_site="lax",
+        https_only=True,
+    )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[
