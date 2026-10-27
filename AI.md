@@ -6,6 +6,7 @@
 - Used Vercel's tree-shakable standalone functions through a small adapter; a bundle of the full Vercel client measured 2.4 MB. Removed the provider-script wrapper and its pnpm install: provider steps call `actions/github-script` directly and need no install, cache, or registry access.
 - Assessed bundling the Vercel CLI and kept it installed through pnpm/setup in build jobs only. Its published `dist` is already an esbuild bundle (317 chunks, 14 MB). It resolves builders such as `@vercel/python` by package name and `require`s them from disk, installing missing builders with npm at run time, and it ships platform binaries (a 162 MB native CLI binary on macOS; esbuild's 10 MB binary). Its installed graph is about 530 MB.
 - Added tests for rebuild drift, license coverage, loading the copied bundle from a directory without `node_modules`, and install-free provider steps. Marked the generated files in `.gitattributes`.
+- Validation: all 33 local tests, actionlint, and action-lock verification pass; the database workflow no longer needs `pnpm/setup`. Signed/GitHub-Verified commit `166e26b` passed backend build `40506480402`, frontend reuse `40506484709`, and frontend build `40506509172`. The provider step in the reuse run took 0.57s with no installation (the whole job took 6s). Only the Vercel CLI setup still installs with pnpm (4–6.5s, build jobs only). Live SSR, exact-origin CORS, and database-backed `/boats` checks passed.
 
 ## 2026-10-27 — Why pnpm/setup cannot cache action-owned lockfiles
 
