@@ -48,6 +48,8 @@ test('bare Git detector compares complete commit trees without a worktree', asyn
   await fs.mkdir(path.dirname(origin), { recursive: true });
   git('clone', '--bare', '--quiet', work, origin);
   execFileSync('git', ['--git-dir', origin, 'config', 'uploadpack.allowFilter', 'true']);
+  const runnerTemp = path.join(directory, 'runner');
+  await fs.mkdir(runnerTemp);
 
   for (const [name, old, next, searched, changed] of [
     ['rename source', before, renamed, 'backend/', true],
@@ -61,11 +63,12 @@ test('bare Git detector compares complete commit trees without a worktree', asyn
     await t.test(name, async () => {
       const output = path.join(directory, 'output');
       await fs.writeFile(output, '');
-      const result = spawnSync('bash', ['-c', script], {
+      // GitHub runs `shell: bash` steps with `-e -o pipefail`.
+      const result = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', script], {
         encoding: 'utf8',
         env: {
           ...process.env,
-          RUNNER_TEMP: directory,
+          RUNNER_TEMP: runnerTemp,
           GITHUB_SERVER_URL: `file://${path.join(directory, 'server')}`,
           GITHUB_REPOSITORY: 'owner/repo',
           GITHUB_OUTPUT: output,
@@ -79,50 +82,24 @@ test('bare Git detector compares complete commit trees without a worktree', asyn
       assert.equal(await fs.readFile(output, 'utf8'), `changed=${changed}\n`);
       assert.match(result.stdout, /\u001b\[/);
       assert.ok(result.stdout.includes(`Searched path: ${JSON.stringify(searched)}`));
-      assert.ok(!(await fs.readdir(directory)).some((name) => name.startsWith('changed-path.')));
+      assert.deepEqual(await fs.readdir(runnerTemp), ['changes.git']);
+      assert.equal(
+        execFileSync(
+          'git',
+          ['--git-dir', path.join(runnerTemp, 'changes.git'), 'rev-parse', '--is-bare-repository'],
+          {
+            encoding: 'utf8',
+          },
+        ).trim(),
+        'true',
+      );
     });
 });
 
-test('short inline CLI setup uses native tool versions and cached installation arguments', async (t) => {
-  const directory = await fs.mkdtemp(
-    path.join(process.env.RUNNER_TEMP || os.tmpdir(), 'rns-setup-'),
-  );
-  t.after(() => fs.rm(directory, { recursive: true, force: true }));
-  const bin = path.join(directory, 'bin');
-  await fs.mkdir(bin);
-  await fs.writeFile(path.join(bin, 'node'), '#!/usr/bin/env bash\necho v24.fixture\n', {
-    mode: 0o755,
-  });
-  await fs.writeFile(path.join(bin, 'vercel'), '#!/usr/bin/env bash\necho vercel.fixture\n', {
-    mode: 0o755,
-  });
-  await fs.writeFile(
-    path.join(bin, 'pnpm'),
-    '#!/usr/bin/env bash\nif [[ $1 == --version ]]; then echo 12.fixture; else printf "%s\\n" "$@" > "$CAPTURE"; fi\n',
-    { mode: 0o755 },
-  );
-  const scripts = await inlineRuns('setup-vercel-cli');
-  assert.equal(scripts.length, 2);
-  const env = {
-    ...process.env,
-    PATH: `${bin}:${process.env.PATH}`,
-    RUNNER_TOOL_CACHE: path.join(directory, 'tools'),
-    RUNNER_TEMP: directory,
-    GITHUB_OUTPUT: path.join(directory, 'output'),
-    GITHUB_PATH: path.join(directory, 'path'),
-    VERCEL_CLI_VERSION: '65.2.0',
-    CAPTURE: path.join(directory, 'args'),
-  };
-  for (const script of scripts)
-    execFileSync('bash', ['-e', '-o', 'pipefail', '-c', script], { env });
-  assert.equal(
-    await fs.readFile(env.GITHUB_OUTPUT, 'utf8'),
-    'node-version=v24.fixture\npnpm-version=12.fixture\n',
-  );
-  assert.equal(
-    await fs.readFile(env.GITHUB_PATH, 'utf8'),
-    `${env.RUNNER_TOOL_CACHE}/vercel-cli/node_modules/.bin\n`,
-  );
-  const args = (await fs.readFile(env.CAPTURE, 'utf8')).trim().split('\n');
-  assert.ok(args.includes('--config.virtual-store-type=project') && args.includes('vercel@65.2.0'));
+test('Git authentication is masked and passed through the environment', async () => {
+  const [script] = await inlineRuns('component-changes');
+  assert.match(script, /base64 -w0\)/);
+  assert.ok(!script.includes('| tr'));
+  assert.match(script, /::add-mask::/);
+  assert.ok(!/fetch[^\n]*(GH_TOKEN|x-access-token)/.test(script));
 });

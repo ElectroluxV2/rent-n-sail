@@ -1,5 +1,12 @@
 # AI usage docs
 
+## 2026-10-27 — pnpm-owned CI tooling and simpler change detection
+
+- AI assistance: OpenCode (GPT-6.1 Sol) implemented the five new PR #14 review threads. Removed the change detector's cleanup trap and generated temporary directory, relying on the runner's per-job temporary directory, and replaced `base64 | tr` with `base64 -w0`. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- Replaced both custom npm/cache setups with action-owned pnpm projects: `provider-script` and `setup-vercel-cli` now each commit `package.json` and `pnpm-lock.yaml`, and run `pnpm/setup` with their own action directory and a frozen lockfile. Vercel CLI setup no longer reads `frontend/`, so it works without or with a sparse checkout. It pins Node 24 and keeps the existing `esbuild` build allowance. Moved provider helpers beside the SDK project so normal package resolution replaces the custom dependency-directory loader.
+- Verified in pnpm/setup v3.1.1 source that absolute action directories are supported, but its bundled cache hashing ignores lockfiles outside `GITHUB_WORKSPACE`; enabling `cache` would fail. The action also deletes its `dest`, so the tool actions use separate temporary pnpm homes to avoid clobbering the frontend job's pnpm store. Measured local cold installs: provider SDKs 5.4s; Vercel CLI 16.8s including Node.
+- pnpm 12's minimum-release-age policy flagged the same-day `@vercel/sdk@1.28.53` and auto-added an exclusion. Pinned the four-day-old `@vercel/sdk@1.28.51` instead of committing a policy bypass; lockfiles contain only public-registry integrity entries.
+
 ## 2026-10-27 — Official provider SDKs with a cached script wrapper
 
 - AI assistance: OpenCode (GPT-6.1 Sol) followed the explicit SDK-adoption decision: removed `.github/provider-clients.md`, replaced custom fetch/pagination code with official `@vercel/sdk@1.28.53` and `@neon/sdk@7.5.0` calls, and kept the high-level provider interface and lazy client loading. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).

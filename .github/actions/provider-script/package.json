@@ -1,12 +1,9 @@
 {
   "name": "rent-n-sail-provider-script",
-  "version": "0.0.0",
   "private": true,
   "dependencies": {
     "@neon/sdk": "7.5.0",
-    "@vercel/sdk": "1.28.53"
+    "@vercel/sdk": "1.28.51"
   },
-  "engines": {
-    "node": ">=24"
-  }
+  "packageManager": "pnpm@12.15.0"
 }

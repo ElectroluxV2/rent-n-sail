@@ -5,7 +5,7 @@ const path = require('node:path');
 const os = require('node:os');
 const deploy = require('../actions/vercel-prebuilt-deploy/deploy.cjs');
 const { packageFrontend } = require('../actions/vercel-prebuilt-deploy/output.cjs');
-const { createProviders } = require('../actions/_shared/providers.cjs');
+const { createProviders } = require('../actions/provider-script/providers.cjs');
 const { commandEnvironment, buildEnvironment } = require('../actions/_shared/commands.cjs');
 
 const root = path.resolve(__dirname, '../..');
@@ -175,7 +175,7 @@ for (const operation of ['database-plan', 'database-branch', 'database-env'])
     const values = {
       NEON_OPERATION: operation,
       NEON_BRANCH_ID: 'preview',
-      PROVIDERS_MODULE: path.join(root, '.github/actions/_shared/providers.cjs'),
+      PROVIDERS_MODULE: path.join(root, '.github/actions/provider-script/providers.cjs'),
     };
     const previous = Object.fromEntries(Object.keys(values).map((key) => [key, process.env[key]]));
     Object.assign(process.env, values);
@@ -238,7 +238,7 @@ test('SDK failures cannot disclose connection details', async () => {
   );
 });
 
-test('official SDKs load from the wrapper dependency directory on Node 24', async (t) => {
+test('official SDKs load from the provider action pnpm installation on Node 24', async (t) => {
   const calls = [];
   t.mock.method(globalThis, 'fetch', async (input) => {
     calls.push(new URL(input.url ?? input).hostname);
@@ -250,7 +250,6 @@ test('official SDKs load from the wrapper dependency directory on Node 24', asyn
   const providers = createProviders({
     core: coreMock(),
     env: {
-      PROVIDER_DEPS_DIR: path.join(root, '.github/actions/provider-script'),
       VERCEL_TOKEN: 'fixture-token',
       VERCEL_ORG_ID: 'team',
       VERCEL_PROJECT_ID: 'project',

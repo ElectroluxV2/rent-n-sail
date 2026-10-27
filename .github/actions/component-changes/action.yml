@@ -21,10 +21,8 @@ runs:
         GH_TOKEN: ${{ github.token }}
       # language=bash
       run: |
-        set -euo pipefail
-        repo=$(mktemp -d "$RUNNER_TEMP/changed-path.XXXXXX")
-        trap 'rm -rf "$repo"' EXIT
-        GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+        repo="$RUNNER_TEMP/changes.git"
+        GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
         export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.extraHeader GIT_CONFIG_VALUE_0
         printf '::add-mask::%s\n' "${GIT_CONFIG_VALUE_0#*basic }"
         git init --bare --quiet "$repo"

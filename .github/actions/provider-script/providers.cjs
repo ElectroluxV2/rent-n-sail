@@ -1,7 +1,4 @@
 const { createHash } = require('node:crypto');
-const { createRequire } = require('node:module');
-const path = require('node:path');
-const { pathToFileURL } = require('node:url');
 
 function aliasName(project, branch, target) {
   if (target === 'production') return `${project}.vercel.app`;
@@ -22,25 +19,20 @@ function createProviders({ core, env = process.env, clients = {} }) {
   };
 
   async function client(provider) {
-    if (!clients[provider]) {
-      const resolve = createRequire(path.join(env.PROVIDER_DEPS_DIR, 'package.json'));
-      const name = provider === 'vercel' ? '@vercel/sdk' : '@neon/sdk';
-      const sdk = await import(pathToFileURL(resolve.resolve(name)).href);
-      clients[provider] =
-        provider === 'vercel'
-          ? new sdk.Vercel({
-              bearerToken: env.VERCEL_TOKEN,
-              timeoutMs: 60_000,
-              retryConfig: { strategy: 'none' },
-            })
-          : sdk.createNeonClient({
-              apiKey: env.NEON_API_KEY,
-              throwOnError: true,
-              retries: 0,
-              requestTimeoutMs: 60_000,
-              waitForReadiness: false,
-            });
-    }
+    clients[provider] ??=
+      provider === 'vercel'
+        ? new (await import('@vercel/sdk')).Vercel({
+            bearerToken: env.VERCEL_TOKEN,
+            timeoutMs: 60_000,
+            retryConfig: { strategy: 'none' },
+          })
+        : (await import('@neon/sdk')).createNeonClient({
+            apiKey: env.NEON_API_KEY,
+            throwOnError: true,
+            retries: 0,
+            requestTimeoutMs: 60_000,
+            waitForReadiness: false,
+          });
     return clients[provider];
   }
 

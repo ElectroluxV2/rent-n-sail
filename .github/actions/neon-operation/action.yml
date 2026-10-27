@@ -19,7 +19,7 @@ runs:
       uses: $/.github/actions/provider-script
       env:
         NEON_OPERATION: ${{ inputs.operation }}
-        PROVIDERS_MODULE: ${{ github.action_path }}/../_shared/providers.cjs
+        PROVIDERS_MODULE: ${{ github.action_path }}/../provider-script/providers.cjs
       with:
         # language=javascript
         script: |

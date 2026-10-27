@@ -2,9 +2,9 @@
 
 ## Entry points
 
-`stack.yml` contains exactly three ordered calls: database → backend → frontend. Provider orchestration uses JavaScript executed by `actions/github-script@v9.0.0`. Short, straight-line CLI tasks stay in Bash: version/cache setup, package installation, and bare-Git comparison. Short scripts are inline in their composite YAML; larger provider/deployment modules live alongside it. There are no Python controllers; native application build/test/migration commands remain normal tool invocations.
+`stack.yml` contains exactly three ordered calls: database → backend → frontend. Provider orchestration uses JavaScript executed by `actions/github-script@v9.0.0`. Short, straight-line CLI tasks stay in inline Bash, such as the bare-Git comparison. Tooling dependencies are pnpm projects owned by their composite actions. Larger provider/deployment modules live alongside their actions. There are no Python controllers; native application build/test/migration commands remain normal tool invocations.
 
-Each reusable workflow calls `.github/actions/component-changes` once, with only `path: database/`, `backend/`, or `frontend/`. Its inline Bash initializes a temporary bare repository and performs a shallow, blobless fetch of the event's `before`/`after` commits. `git diff --name-only --no-renames -z` compares their complete trees: both sides of renames are included, and filenames remain NUL-delimited until jq encodes them. No checkout action or worktree is used. Git authentication stays in the process environment rather than a URL, argument, or persisted credential config. The temporary repository is removed on exit.
+Each reusable workflow calls `.github/actions/component-changes` once, with only `path: database/`, `backend/`, or `frontend/`. Its inline Bash initializes a bare repository in the runner's per-job temporary directory and performs a shallow, blobless fetch of the event's `before`/`after` commits. `git diff --name-only --no-renames -z` compares their complete trees: both sides of renames are included, and filenames remain NUL-delimited until jq encodes them. No checkout action or worktree is used. Git authentication stays in the process environment rather than a URL, argument, or persisted credential config. The runner discards the temporary directory after the job.
 
 Logs show the searched substring, escaped changed paths with forced `jq -C` colors, and the plain boolean match. Matching uses the uncolored JSON. There is no GitHub comparison API or 300-file cap: large diffs use their actual paths rather than forcing unrelated applications to build. Git failures fail the step instead of reporting "unchanged".
 
@@ -14,7 +14,7 @@ The frontend is compiled once during validation. The deployment action packages 
 
 `database.yml`, `backend.yml`, and `frontend.yml` are manual-only entry points; each calls only its corresponding reusable workflow. Manual application runs default to a build. Backend credentials are read privately from the matching Neon branch; the frontend reads its matching READY backend deployment through Vercel. Missing dependencies fail with an instruction to run the relevant workflow; no reusable workflow invokes another application's CI/CD. The frontend receives no Neon secrets.
 
-Local actions and reusable workflows use `$/` references, so they resolve to their defining repository's running commit without requiring a workspace checkout. Source is checked out only before application validation/builds or database migration tools. Both automatic and manual reuse-only application runs need no checkout, application toolchain setup, or Vercel CLI; provider SDK dependencies are restored by the shared script wrapper.
+Local actions and reusable workflows use `$/` references, so they resolve to their defining repository's running commit without requiring a workspace checkout. Source is checked out only before application validation/builds or database migration tools. Both automatic and manual reuse-only application runs need no checkout, application toolchain setup, or Vercel CLI; the provider-script action installs only its locked SDK project.
 
 Each caller owns one non-cancelling stack queue per Git ref, shared across automatic/manual entry points. Reusable jobs do not add nested queues. GitHub deployment-environment names are unchanged (including production environments); queue identity does not override their settings. Deployment-target selection uses GitHub's documented `case(...)` expression.
 
@@ -28,11 +28,13 @@ Every configured workflow/composite step has an explicit emoji-prefixed name. Th
 - 🧹 lint; 🎨 formatting; 🧪 tests; 🔨 builds.
 - 🚀 publication/migrations; 📝 reports; ❌ failures.
 
-Selection and resource-resolution steps log their decisions: full build/migration versus reuse, preview branch creation/reuse, selected production parent/database reference, and chosen deployment IDs/URLs. Private connection values and tokens are not printed. `.cjs` modules live beside their action definitions; shared provider/command helpers are in `.github/actions/_shared`. Actions expressions reach JavaScript through environment variables, never interpolated into executable code. Module calls do not return credential-bearing values to github-script's automatic result output. Package/build subprocesses do not receive github-script token inputs. Regression tests run locally with Node's built-in test runner, not as an extra workflow step.
+Selection and resource-resolution steps log their decisions: full build/migration versus reuse, preview branch creation/reuse, selected production parent/database reference, and chosen deployment IDs/URLs. Private connection values and tokens are not printed. `.cjs` modules live beside their action definitions; provider helpers live with the provider-script SDK project, and command helpers are in `.github/actions/_shared`. Actions expressions reach JavaScript through environment variables, never interpolated into executable code. Module calls do not return credential-bearing values to github-script's automatic result output. Package/build subprocesses do not receive github-script token inputs. Regression tests run locally with Node's built-in test runner, not as an extra workflow step.
 
 Provider callers use high-level helpers such as `getDatabasePreviewFor`, `getApplicationDeploymentFor`, and `getApplicationRuntimeFor`, implemented with the official `@neon/sdk` and `@vercel/sdk` clients. The SDKs own HTTP transport and pagination; the helpers retain exact branch selection, alias ownership, and credential masking. Clients are loaded lazily, so frontend/reuse operations do not require Neon credentials.
 
-`.github/actions/provider-script` wraps `actions/github-script` and restores an action-only SDK installation from cache. Its manifest and npm lockfile pin both clients and their transitive dependency. Cache keys include the lockfile digest, platform, architecture, and script runtime's Node major. A cache miss runs `npm ci --ignore-scripts` without provider/database credentials; later scripts in the same job reuse the ready installation without another cache restore. No application checkout or checked-in SDK bundle is needed. Provider scripts receive only public resource outputs; migration credentials remain job-private.
+`.github/actions/provider-script` and `.github/actions/setup-vercel-cli` each contain their own `package.json`, pinned `pnpm-lock.yaml`, and pnpm version. Each runs `pnpm/setup` with its action directory as `working-directory` and `require-lockfile: true`, so pnpm and dependencies come from the action snapshot rather than `frontend/` or any (possibly sparse) checkout. The Vercel CLI project also pins Node 24 and keeps the existing `esbuild` build-script allowance. Provider scripts run on `github-script`'s Node 24, so their project installs no separate runtime. Package installation receives no provider/database credentials. Provider scripts receive only public resource outputs; migration credentials remain job-private.
+
+`pnpm/setup` replaces its `dest` on every run, so each tool action uses its own pnpm home under the runner's temporary directory, leaving an application job's pnpm store and runtime intact. Its store cache is not enabled: the action hashes only lockfiles inside `GITHUB_WORKSPACE`, while these action snapshots live outside it. Tool installs therefore fetch from the registry when first used in a job; repeated provider scripts reuse the action's existing `node_modules`.
 
 The Neon composite dispatches its three operations through an inline object of async handlers. It exposes branch IDs as outputs and exports the masked migration URI only to the consuming job environment; no credential-bearing handler value is returned from `github-script`.
 
@@ -79,7 +81,7 @@ Jobs have no fork-PR skip condition. Fork PRs still do not receive repository se
 ## Verification
 
 ```bash
-npm ci --prefix .github/actions/provider-script --ignore-scripts
+pnpm --dir .github/actions/provider-script install --frozen-lockfile
 node --test .github/tests/*.test.cjs
 uv run --directory backend --locked pytest -q
 ```
