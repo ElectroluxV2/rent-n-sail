@@ -24,6 +24,8 @@ for (const [action, dest, dependencies] of [
     const text = await read(`${action}/action.yml`);
     assert.match(text, /uses: pnpm\/setup@v3\.1\.1/);
     assert.match(text, /working-directory: \$\{\{ github\.action_path \}\}/);
+    // A derived `../` lockfile glob fails inside pnpm/setup for action snapshots outside the workspace.
+    assert.match(text, /cache-dependency-path: \$\{\{ github\.action_path \}\}\/pnpm-lock\.yaml/);
     assert.match(text, /require-lockfile: true/);
     // pnpm/setup replaces its dest; a separate home preserves an application's pnpm store.
     assert.ok(text.includes(`dest: \${{ runner.temp }}/${dest}`));

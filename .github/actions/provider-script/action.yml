@@ -31,6 +31,8 @@ runs:
         DATABASE_URL: ""
       with:
         working-directory: ${{ github.action_path }}
+        # pnpm/setup turns an action-local lockfile into a rejected `../` glob; an absolute path is accepted.
+        cache-dependency-path: ${{ github.action_path }}/pnpm-lock.yaml
         dest: ${{ runner.temp }}/provider-script-pnpm
         require-lockfile: true
     - name: 🔗 Run provider script
