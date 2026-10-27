@@ -1,5 +1,9 @@
 # AI usage docs
 
+## 2026-10-27 — Vercel CLI caching status
+
+- AI assistance: OpenCode (GPT-6.1 Sol) answered that the Vercel CLI is no longer cached: build jobs install it through `pnpm/setup` from the action-owned lockfile, while reuse runs skip it. Compared logged step durations: 4.1–6.5s uncached versus 4.7s for the former `actions/cache` path, because pnpm and Node are downloaded either way. No code was changed. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
 ## 2026-10-27 — Checked-in provider SDK bundle; Vercel CLI stays installed
 
 - AI assistance: OpenCode (GPT-6.1 Sol) implemented the user's proposal to bundle provider dependencies with esbuild. Added `.github/actions/_shared/vendor`, which pins `@neon/sdk@7.5.0`, `@vercel/sdk@1.28.51`, and `esbuild@0.28.2` with a pnpm lockfile. Its `build.mjs` writes the checked-in `sdk.cjs` (274 KB, 60 KB gzipped) and `THIRD_PARTY_NOTICES.txt`, because this public repository redistributes the bundled Apache-2.0/MIT code. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
