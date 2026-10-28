@@ -1,5 +1,14 @@
 # AI usage docs
 
+## 2026-10-28 — Sequence diagrams of every CI/CD path
+
+- AI assistance: OpenCode (Claude Opus 5.5) added `docs/cicd.md`, next to `docs/auth-flow.md`. It holds 12 Mermaid sequence diagrams and an outcome table that cover every trigger, target, and component path of the pipeline. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+  - **Coverage:**
+    - Triggers and job order: pull requests, merges, manual runs, the per-branch queue, and pull requests from forks.
+    - The pull request lifecycle, and the mechanisms each job uses: change detection, ensure, preview cleanup, forks, and settings and aliases.
+    - Each component job, the report's results, and failures.
+  - **Checks:** read every diagram against the workflows, the actions, and `providers.cjs`. Rendered each one with Mermaid CLI using GitHub's default theme and fonts, to catch syntax errors and overflowing text.
+
 ## 2026-10-28 — Delete previews of branches without an open pull request
 
 - AI assistance: OpenCode (Claude Opus 5.5) made each component's `ensure` stage delete its provider's previews of Git branches that have no open pull request, keeping the run's own branch. This replaces a proposed 3-day expiry, which Vercel cannot express: its retention has no 3-day option and never deletes previews with an alias. The production run after a merge now removes the merged branch's previews. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
