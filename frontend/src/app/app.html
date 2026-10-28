@@ -211,7 +211,7 @@
   } @else if (backendHello.hasValue()) {
     <p role="status">Backend says: {{ backendHello.value().Hello }}</p>
   } @else if (backendHello.error()) {
-    <p role="alert">Could not reach the backend.</p>
+    <p role="alert">Could not reach the backend 😿.</p>
   }
   <form [formRoot]="checkForm">
     <button type="submit" [disabled]="checkForm().submitting() || backendHello.isLoading()">
