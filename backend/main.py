@@ -58,7 +58,7 @@ api_router = APIRouter()
 
 @api_router.get("/")
 def read_root():
-    return {"Hello": "World"}
+    return {"Hello": "World 😸"}
 
 
 @api_router.get("/health")
