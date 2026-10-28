@@ -1,5 +1,13 @@
 # AI usage docs
 
+## 2026-10-28 — Delete previews of branches without an open pull request
+
+- AI assistance: OpenCode (Claude Opus 5.5) made each component's `ensure` stage delete its provider's previews of Git branches that have no open pull request, keeping the run's own branch. This replaces a proposed 3-day expiry, which Vercel cannot express: its retention has no 3-day option and never deletes previews with an alias. The production run after a merge now removes the merged branch's previews. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+  - **Neon:** deletes other branches' `preview/<branch>` database branches and waits for each deletion, so a fork that follows doesn't hit a locked project (HTTP 423).
+  - **Vercel:** deletes the pipeline's own preview aliases, including the frontend alias the backend reserves, and the preview deployments whose `githubCommitRef` names such a branch. Production, other aliases, and deployments without a `githubCommitRef` stay. The vendored SDK bundle gained `aliasesListAliases`, `aliasesDeleteAlias`, and `deploymentsDeleteDeployment` (+6 KB).
+  - **Failures:** a failed cleanup only warns, so it never blocks a release; the next run retries it.
+  - **Verification:** a throwaway mock of both providers and the real bundled SDK against a stubbed `fetch`; no tests were added, per project guidelines. Stack run `40751355386` then deleted the previews of the merged `cd` and of teammate PRs #16 and #17, which were closed without merging. That was 3 Neon branches, plus 3 aliases and 4 deployments in the backend and 3 aliases and 5 deployments in the frontend. It then forked this branch's previews, and the deleted aliases return `DEPLOYMENT_NOT_FOUND`. A re-run reused the previews and deleted nothing.
+
 ## 2026-10-28 — Benchmark: vendored SDK bundle vs. cached pnpm install
 
 - AI assistance: OpenCode (Claude Opus 5.5) pulled the user's seven new `cd` commits by fast-forward, then benchmarked provider SDK loading on a throwaway branch, `sdk-install-benchmark`. Run `40654874805` used `ubuntu-26.04` with 5 samples per variant, and the results are posted as a PR #14 comment. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
