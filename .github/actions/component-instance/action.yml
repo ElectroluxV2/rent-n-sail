@@ -10,10 +10,11 @@ inputs:
     description: |
       Stage to run. Every component uses ensure, settings, and report; pull, package, and release are only for the
       backend and frontend, because the database releases its update with Alembic.
-      - ensure: find the instance for the target and Git branch, and record its ID and address. A missing preview
-        is forked from the production source with the branch's settings, unless an update follows on a versioned
-        provider (Vercel), whose release creates it. Neon branches are always forked first, because migrations
-        change them in place.
+      - ensure: delete the component's previews of Git branches with no open pull request, except the run's own
+        branch; a failed deletion only warns. Then find the instance for the target and Git branch, and record its
+        ID and address. A missing preview is forked from the production source with the branch's settings, unless
+        an update follows on a versioned provider (Vercel), whose release creates it. Neon branches are always
+        forked first, because migrations change them in place.
       - pull: download the Vercel project configuration and environment for the target with `vercel pull`.
       - package: produce the version's Vercel Build Output: `vercel build` for the backend, or the frontend's
         already validated Angular SSR build, laid out without building again.
@@ -47,4 +48,4 @@ runs:
       with:
         # language=javascript
         script: |
-          await require(process.env.CI_SCRIPT)({ core, exec });
+          await require(process.env.CI_SCRIPT)({ core, exec, github, context });

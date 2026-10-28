@@ -41,6 +41,18 @@ function createProviders({ core, exec, env = process.env }) {
     throw result.error;
   }
 
+  // Vercel lists newest first; `pagination.next` is the timestamp the next page ends before.
+  async function vercelList(operation, request, key) {
+    const items = [];
+    let until;
+    do {
+      const page = await vercelRequest(operation, { ...request, limit: 100, until });
+      items.push(...page[key]);
+      until = page.pagination.next;
+    } while (until);
+    return items;
+  }
+
   async function getProductionDatabaseBranch() {
     const selected = env.NEON_PARENT_BRANCH_ID;
     const branches = await neonRequest((client) =>
@@ -54,8 +66,8 @@ function createProviders({ core, exec, env = process.env }) {
     return { id: source.id, address: source.name };
   }
 
-  function databaseBranchName() {
-    return `preview/${branch}`;
+  function databaseBranchName(gitBranch = branch) {
+    return `preview/${gitBranch}`;
   }
 
   async function findDatabaseBranch() {
@@ -76,6 +88,24 @@ function createProviders({ core, exec, env = process.env }) {
       client.branches.create({ projectId: env.NEON_PROJECT_ID, name, parent_id: source.id }),
     );
     return { id, address: name };
+  }
+
+  async function deleteDatabaseBranchesExcept(gitBranches) {
+    const kept = gitBranches.map((gitBranch) => databaseBranchName(gitBranch));
+    const branches = await neonRequest((client) =>
+      client.branches.list({ projectId: env.NEON_PROJECT_ID, search: 'preview/' }).all(),
+    );
+    for (const { id, name } of branches) {
+      if (!name.startsWith('preview/') || kept.includes(name)) continue;
+      core.info(`Deleting ${name} (${id}).`);
+      // Waiting keeps the deletion from locking the project (HTTP 423) for a fork that follows.
+      await neonRequest((client) =>
+        client.branches.delete(
+          { projectId: env.NEON_PROJECT_ID, branchId: id },
+          { waitForReadiness: true },
+        ),
+      );
+    }
   }
 
   async function getDatabaseConnection(pooled) {
@@ -196,6 +226,34 @@ function createProviders({ core, exec, env = process.env }) {
     return pointServiceAlias(`https://${deployment.url}`);
   }
 
+  // Only serviceAlias's preview aliases and deployments tagged with a Git branch are the pipeline's
+  // own; production and every other alias or deployment stay.
+  async function deleteServiceDeploymentsExcept(gitBranches) {
+    const projectId = env.VERCEL_PROJECT_ID;
+    const { name } = await vercelRequest(sdk.projectsGetProject, { idOrName: projectId });
+    const kept = gitBranches.map((gitBranch) => serviceAlias(name, gitBranch, 'preview'));
+    const preview = new RegExp(
+      `^${RegExp.escape(name.slice(0, 42))}-preview-[0-9a-f]{12}\\.vercel\\.app$`,
+    );
+    const aliases = await vercelList(sdk.aliasesListAliases, { projectId }, 'aliases');
+    for (const { alias, uid } of aliases) {
+      if (!preview.test(alias) || kept.includes(alias)) continue;
+      core.info(`Deleting alias ${alias}.`);
+      await vercelRequest(sdk.aliasesDeleteAlias, { aliasId: uid }, { nullIfNotFound: true });
+    }
+    const deployments = await vercelList(
+      sdk.deploymentsGetDeployments,
+      { projectId, target: 'preview' },
+      'deployments',
+    );
+    for (const { uid, meta } of deployments) {
+      const gitBranch = meta?.githubCommitRef;
+      if (!gitBranch || gitBranches.includes(gitBranch)) continue;
+      core.info(`Deleting ${uid} of ${gitBranch}.`);
+      await vercelRequest(sdk.deploymentsDeleteDeployment, { id: uid }, { nullIfNotFound: true });
+    }
+  }
+
   async function reserveServiceAlias(projectId) {
     const hostname = await serviceAddress(projectId);
     if (target === 'preview' && !(await ownedServiceAlias(hostname, projectId))) {
@@ -280,9 +338,11 @@ function createProviders({ core, exec, env = process.env }) {
   return {
     findDatabaseBranch,
     forkDatabaseBranch,
+    deleteDatabaseBranchesExcept,
     getDatabaseSettings,
     findServiceDeployment,
     forkServiceDeployment,
+    deleteServiceDeploymentsExcept,
     getBackendServiceSettings,
     getFrontendServiceSettings,
     pullServiceConfig,

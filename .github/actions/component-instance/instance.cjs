@@ -8,6 +8,7 @@ function componentFor({ env, providers }) {
       versioned: false,
       findInstance: providers.findDatabaseBranch,
       forkInstance: providers.forkDatabaseBranch,
+      deletePreviewsExcept: providers.deleteDatabaseBranchesExcept,
       resolveSettings: providers.getDatabaseSettings,
     };
   const frontend = env.COMPONENT === 'frontend';
@@ -19,6 +20,7 @@ function componentFor({ env, providers }) {
     versioned: true,
     findInstance: providers.findServiceDeployment,
     forkInstance: async () => providers.forkServiceDeployment(await resolveSettings()),
+    deletePreviewsExcept: providers.deleteServiceDeploymentsExcept,
     resolveSettings,
     pullConfig: providers.pullServiceConfig,
     packageVersion: frontend
@@ -42,8 +44,26 @@ async function summarize(core, env, lines) {
     .write();
 }
 
+// A preview lives while its Git branch has an open pull request, and through a run that deploys it.
+// A failed cleanup only warns, so it never blocks a release; the next ensure retries it.
+async function deleteStalePreviews({ core, env, github, context, component }) {
+  try {
+    const pulls = await github.paginate(github.rest.pulls.list, {
+      ...context.repo,
+      state: 'open',
+      per_page: 100,
+    });
+    const kept = [...new Set([env.DEPLOY_BRANCH, ...pulls.map((pull) => pull.head.ref)])];
+    core.info(`Keeping the previews of ${kept.join(', ')}.`);
+    await component.deletePreviewsExcept(kept);
+  } catch (error) {
+    core.warning(`Stale previews remain: ${error.message}`);
+  }
+}
+
 const operations = {
-  async ensure({ core, env, component }) {
+  async ensure({ core, env, github, context, component }) {
+    await deleteStalePreviews({ core, env, github, context, component });
     const found = await component.findInstance();
     if (found) {
       core.info(`Found ${found.id} at ${found.address}.`);
@@ -86,11 +106,12 @@ const operations = {
   },
 };
 
-module.exports = async ({ core, exec, env = process.env }) => {
+module.exports = async ({ core, exec, github, context, env = process.env }) => {
   const operation = env.INSTANCE_OPERATION;
   try {
     const providers = createProviders({ core, exec, env });
-    await operations[operation]({ core, env, component: componentFor({ env, providers }) });
+    const component = componentFor({ env, providers });
+    await operations[operation]({ core, env, github, context, component });
   } catch (error) {
     await summarize(core, env, [
       ['Result', `❌ ${operation} failed`],
