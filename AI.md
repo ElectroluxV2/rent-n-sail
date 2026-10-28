@@ -1,5 +1,12 @@
 # AI usage docs
 
+## 2026-10-28 — Benchmark: vendored SDK bundle vs. cached pnpm install
+
+- AI assistance: OpenCode (Claude Opus 5.5) pulled the user's seven new `cd` commits by fast-forward, then benchmarked provider SDK loading on a throwaway branch, `sdk-install-benchmark`. Run `40654874805` used `ubuntu-26.04` with 5 samples per variant, and the results are posted as a PR #14 comment. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+  - **Variants:** the checked-in bundle; pnpm with an `actions/cache` store keyed on the action-owned lockfile; and `pnpm/setup` with `cache: true`, which needs a sparse checkout. Each ran cold and warm.
+  - **Results:** the SDKs were ready in 0.41 s with the bundle, against 2.9–4.4 s for the pnpm variants. A miss also adds 1.2–1.6 s to save the cache. Warm runs were slower than cold ones, because restoring the ~8 MB store (1.6 s) took longer than installing the 3 packages from npm (0.76 s).
+  - **Cleanup:** deleted the throwaway branch, its worktree, and the 15 caches the benchmark created.
+
 ## 2026-10-27 — Canonicalize frontend host for WebAuthn
 
 - AI assistance: Junie (gpt-6-luna) traced the RP ID mismatch to the production frontend being reachable through `rent-n-sail-frontend-eu.vercel.app` while passkey options use `rent-n-sail.vercel.app`. The SSR server now redirects alternate hosts to the configured `FRONTEND_URL` (or `PORTLESS_URL` locally), keeping browser origins aligned with the backend's WebAuthn RP ID and origin. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
