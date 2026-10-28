@@ -1,0 +1,20 @@
+name: Set up Vercel CLI
+description: Install the lockfile-pinned Vercel CLI on the runner's Node.js, independently of any checkout.
+runs:
+  using: composite
+  steps:
+    # Hosted runners ship Node.js, so this action installs only pnpm and the CLI, which runs on the `node`
+    # already on PATH. Only the frontend build installs Node.js, because it must restore the exact
+    # version locked by frontend/package.json.
+    - name: ⚙️ Set up Vercel CLI
+      uses: pnpm/setup@v3.1.1
+      with:
+        working-directory: ${{ github.action_path }}
+        # pnpm/setup turns an action-local lockfile into a rejected `../` glob; an absolute path is accepted.
+        cache-dependency-path: ${{ github.action_path }}/pnpm-lock.yaml
+        dest: ${{ runner.temp }}/vercel-cli-pnpm
+        require-lockfile: true
+    - name: ⚙️ Add Vercel CLI to PATH
+      shell: bash
+      # language=bash
+      run: pnpm --dir "$GITHUB_ACTION_PATH" bin >> "$GITHUB_PATH"

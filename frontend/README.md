@@ -4,13 +4,18 @@ This project was generated using [Angular CLI](https://github.com/angular/angula
 
 ## Development server
 
-To start a local development server, run:
+After installing frontend dependencies, run these commands in separate terminals from `frontend`; no environment file is required:
 
 ```bash
-ng serve
+pnpm run start:backend
+pnpm start
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+[Portless](https://github.com/vercel-labs/portless) exposes the backend at `https://backend.localhost` and the frontend at `https://frontend.localhost`. It assigns free application ports automatically; FastAPI reads the injected `PORT` variable natively. Scripts pass the application commands directly to Portless. Origin defaults live in `src/local-origins.ts`. The browser calls the backend through `/api/` on the frontend's origin, and the frontend's server forwards those requests to `BACKEND_URL`.
+
+On first use, Portless may request permission to trust its local CA and bind HTTPS port 443. Run it interactively and follow its prompts. For custom proxy ports, TLS modes, hostnames, or worktrees, set `BACKEND_URL` to the backend's actual Portless URL, and set the backend's `WEBAUTHN_ORIGIN` and `WEBAUTHN_RP_ID` to the frontend's actual origin and hostname. No local CA or system trust changes are performed by repository setup.
+
+Open `https://frontend.localhost/`. The application will automatically reload when source files change.
 
 ## Code scaffolding
 

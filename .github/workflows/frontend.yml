@@ -1,57 +1,26 @@
-name: Frontend CI
-
+name: 🌐 Manual frontend CI/CD
 on:
-  pull_request:
-    paths:
-      - "frontend/**"
-      - ".github/workflows/frontend.yml"
-  workflow_dispatch: 
-
+  workflow_dispatch:
+    inputs:
+      target:
+        type: choice
+        options: [preview, production]
+        default: preview
+      update:
+        type: boolean
+        default: true
 permissions:
   contents: read
-
+  pull-requests: write
+concurrency:
+  group: stack-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: false
+  queue: max
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    
-    env:
-      PNPM_CONFIG_COLOR: always
-      FORCE_COLOR: "1"
-    
-    defaults:
-      run:
-        working-directory: frontend
-    
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7.0.1
-        with:
-          fetch-depth: 0
-          filter: tree:0
-          persist-credentials: false
-
-      - name: Pnpm
-        uses: pnpm/setup@v3.1.1
-        with:
-          working-directory: frontend
-          cache: true
-
-      - name: Lint (Angular ESLint)
-        if: always()
-        # language=bash
-        run: pnpm exec eslint . --format gha
-      
-      - name: Check formatting
-        if: always()
-        uses: oxc-project/oxfmt-action@v0.0.1
-        with:
-          working-directory: frontend
-
-      - name: Run Unit Tests (Vitest)
-        if: always()
-        # language=bash
-        run: pnpm exec ng test --no-watch --no-progress --reporters=github-actions   
-
-      - name: Angular
-        # language=bash
-        run: pnpm exec ng build
+  frontend:
+    name: 🌐 Frontend
+    uses: $/.github/workflows/reusable-frontend.yml
+    with:
+      target: ${{ inputs.target }}
+      update: ${{ inputs.update }}
+    secrets: inherit

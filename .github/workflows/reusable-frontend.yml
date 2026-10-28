@@ -1,0 +1,120 @@
+name: Reusable frontend CI/CD
+on:
+  workflow_call:
+    inputs:
+      target:
+        type: string
+        required: true
+      update:
+        type: boolean
+        default: false
+    secrets:
+      VERCEL_TOKEN:
+        required: false
+    outputs:
+      instance_id:
+        value: ${{ jobs.frontend.outputs.instance_id }}
+      address:
+        value: ${{ jobs.frontend.outputs.address }}
+      result:
+        value: ${{ jobs.frontend.outputs.result }}
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  frontend:
+    name: Deployment
+    runs-on: ubuntu-26.04
+    environment:
+      name: ${{ inputs.target == 'production' && 'frontend-production' || 'frontend-preview' }}
+      url: ${{ steps.report.outputs.address }}
+    outputs:
+      instance_id: ${{ steps.report.outputs.instance_id }}
+      address: ${{ steps.report.outputs.address }}
+      result: ${{ steps.report.outputs.result }}
+    env:
+      COMPONENT: frontend
+      DEPLOY_BRANCH: ${{ github.head_ref || github.ref_name }}
+      DEPLOY_TARGET: ${{ inputs.target }}
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_BACKEND_PROJECT_ID: ${{ vars.VERCEL_BACKEND_PROJECT_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_FRONTEND_PROJECT_ID }}
+    steps:
+      - name: 🔍 Detect changes
+        uses: $/.github/actions/component-changes
+        with:
+          path: frontend/
+          update: ${{ inputs.update }}
+      - name: 🌱 Ensure instance
+        uses: $/.github/actions/component-instance
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        with:
+          operation: ensure
+      - name: 📥 Check out source
+        if: env.BUILD_NEEDED == 'true'
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      # Also installs the locked dependencies.
+      - name: ⚙️ Set up Node.js and pnpm
+        uses: pnpm/setup@v3.1.1
+        if: env.BUILD_NEEDED == 'true'
+        with:
+          working-directory: frontend
+          cache: true
+      - name: 🧹 Lint
+        if: ${{ !cancelled() && env.BUILD_NEEDED == 'true' }}
+        working-directory: frontend
+        # language=bash
+        run: pnpm exec eslint . --format gha
+      - name: 🎨 Check formatting
+        if: ${{ !cancelled() && env.BUILD_NEEDED == 'true' }}
+        uses: oxc-project/oxfmt-action@v0.0.1
+        with:
+          working-directory: frontend
+      - name: 🧪 Run tests
+        if: ${{ !cancelled() && env.BUILD_NEEDED == 'true' }}
+        working-directory: frontend
+        # language=bash
+        run: pnpm exec ng test --watch=false --reporters=default --reporters=github-actions
+      - name: 🔨 Build application
+        if: ${{ !cancelled() && env.BUILD_NEEDED == 'true' }}
+        working-directory: frontend
+        # language=bash
+        run: pnpm exec ng build
+      # After the quality gates: the CLI's pnpm setup takes over PATH and PNPM_HOME.
+      - name: ⚙️ Set up Vercel CLI
+        if: env.BUILD_NEEDED == 'true'
+        uses: $/.github/actions/setup-vercel-cli
+      - name: 📥 Pull project configuration
+        if: env.BUILD_NEEDED == 'true'
+        uses: $/.github/actions/component-instance
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        with:
+          operation: pull
+      - name: 🔨 Package version
+        if: env.BUILD_NEEDED == 'true'
+        uses: $/.github/actions/component-instance
+        with:
+          operation: package
+      - name: 🔐 Resolve settings
+        if: env.BUILD_NEEDED == 'true'
+        uses: $/.github/actions/component-instance
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        with:
+          operation: settings
+      - name: 🚀 Release update
+        if: env.BUILD_NEEDED == 'true'
+        uses: $/.github/actions/component-instance
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        with:
+          operation: release
+      - name: 📝 Report instance
+        id: report
+        uses: $/.github/actions/component-instance
+        with:
+          operation: report

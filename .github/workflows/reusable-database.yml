@@ -1,0 +1,98 @@
+name: Reusable database CI/CD
+on:
+  workflow_call:
+    inputs:
+      target:
+        type: string
+        required: true
+      update:
+        type: boolean
+        default: false
+    secrets:
+      NEON_API_KEY:
+        required: false
+      NEON_PROJECT_ID:
+        required: false
+    outputs:
+      instance_id:
+        value: ${{ jobs.database.outputs.instance_id }}
+      address:
+        value: ${{ jobs.database.outputs.address }}
+      result:
+        value: ${{ jobs.database.outputs.result }}
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  database:
+    name: Deployment
+    runs-on: ubuntu-26.04
+    environment:
+      name: ${{ inputs.target == 'production' && 'database-production' || 'database-preview' }}
+    outputs:
+      instance_id: ${{ steps.report.outputs.instance_id }}
+      address: ${{ steps.report.outputs.address }}
+      result: ${{ steps.report.outputs.result }}
+    env:
+      COMPONENT: database
+      DEPLOY_BRANCH: ${{ github.head_ref || github.ref_name }}
+      DEPLOY_TARGET: ${{ inputs.target }}
+      NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+      NEON_PARENT_BRANCH_ID: ${{ vars.NEON_PARENT_BRANCH_ID }}
+    steps:
+      - name: 🔍 Detect changes
+        uses: $/.github/actions/component-changes
+        with:
+          path: database/
+          update: ${{ inputs.update }}
+      - name: 🌱 Ensure instance
+        uses: $/.github/actions/component-instance
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        with:
+          operation: ensure
+      - name: 📥 Check out source
+        if: env.BUILD_NEEDED == 'true'
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: ⚙️ Set up uv and Python
+        uses: astral-sh/setup-uv@v10.3.2
+        if: env.BUILD_NEEDED == 'true'
+        env:
+          # The project venv gets a managed Python 3.14; later uv commands reuse that venv.
+          # https://docs.astral.sh/uv/reference/environment/#uv_python_preference
+          UV_PYTHON_PREFERENCE: only-managed
+        with:
+          working-directory: database
+          enable-cache: true
+          cache-python: true
+          activate-environment: true
+      - name: 📦 Install dependencies
+        if: env.BUILD_NEEDED == 'true'
+        # language=bash
+        run: uv sync --directory database --locked
+      - name: 🔐 Resolve settings
+        if: env.BUILD_NEEDED == 'true'
+        uses: $/.github/actions/component-instance
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        with:
+          operation: settings
+      - name: 🚀 Release update
+        if: env.BUILD_NEEDED == 'true'
+        # language=bash
+        run: uv run --directory database --locked alembic upgrade head
+      - name: 📝 Comment schema changes
+        if: env.BUILD_NEEDED == 'true' && github.event_name == 'pull_request' && env.DEPLOY_TARGET == 'preview'
+        uses: neondatabase/schema-diff-action@v1.0.1
+        with:
+          api_key: ${{ secrets.NEON_API_KEY }}
+          project_id: ${{ env.NEON_PROJECT_ID }}
+          # The base defaults to the preview's parent: the production source it was forked from.
+          compare_branch: ${{ env.INSTANCE_ID }}
+      - name: 📝 Report instance
+        id: report
+        uses: $/.github/actions/component-instance
+        with:
+          operation: report

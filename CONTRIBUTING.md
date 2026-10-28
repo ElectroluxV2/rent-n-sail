@@ -3,13 +3,25 @@
 ## Local setup
 
 1. Install pnpm 12: https://pnpm.io/installation
-2. Install Node.js 26: `pnpm runtime set --global node 26`
+2. Install Node.js using pnpm: `pnpm env use --global 24`. This matches `devEngines.runtime` in `frontend/package.json`.
 3. Install frontend dependencies: `cd frontend && pnpm install`
 4. uv 0.13.5: https://docs.astral.sh/uv/getting-started/installation/
-5. python 3.15: `uv python install 3.15`
-6. install backend dependencies: `cd backend && uv sync`
-7. Run the backend from `backend`: `uv run fastapi dev main.py --port 5000`. AuthTuna stores local user and passkey data in `backend/authtuna_dev.db`.
-8. In another terminal, run the frontend from `frontend`: `pnpm start`. It listens on `http://localhost:4200` and its development proxy forwards `/api` requests to `http://127.0.0.1:5000`.
+5. Install backend dependencies: `cd backend && uv sync`. uv selects Python from `backend/pyproject.toml`.
+
+## Local development
+
+Portless is installed with the frontend development dependencies. Start the services from `frontend` in separate terminals; no environment file is required:
+
+```bash
+pnpm run start:backend
+pnpm start
+```
+
+Use `https://frontend.localhost` and `https://backend.localhost`. The first interactive run may ask to trust the local CA and bind port 443. See [frontend/README.md](frontend/README.md#development-server) for configuration overrides.
+
+To exercise the sample inventory, set `DATABASE_URL` in your process environment to a direct Neon development/preview connection, apply the [database migrations](database/README.md), then request `/boats` on the backend origin, or `/api/boats` through the frontend, which forwards `/api/` to the backend. The backend serves `/` and `/health` too. Never commit connection strings.
+
+AuthTuna stores local user and passkey data in `backend/authtuna_dev.db`.
 
 ## Formatting
 

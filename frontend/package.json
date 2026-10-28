@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "ng": "ng",
-    "start": "ng serve",
+    "start": "portless frontend ng serve",
+    "start:backend": "portless backend uv run --directory ../backend fastapi dev",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
@@ -38,9 +39,17 @@
     "eslint-formatter-gha": "^2.0.1",
     "jsdom": "^30.0.0",
     "oxfmt": "^0.74.0",
+    "portless": "0.15.11",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.72.0",
     "vitest": "^5.0.0"
+  },
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "24",
+      "onFail": "download"
+    }
   },
   "packageManager": "pnpm@12.15.0"
 }

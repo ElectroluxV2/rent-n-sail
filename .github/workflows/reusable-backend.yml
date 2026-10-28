@@ -1,0 +1,132 @@
+name: Reusable backend CI/CD
+on:
+  workflow_call:
+    inputs:
+      target:
+        type: string
+        required: true
+      update:
+        type: boolean
+        default: false
+    secrets:
+      VERCEL_TOKEN:
+        required: false
+      NEON_API_KEY:
+        required: false
+      NEON_PROJECT_ID:
+        required: false
+    outputs:
+      instance_id:
+        value: ${{ jobs.backend.outputs.instance_id }}
+      address:
+        value: ${{ jobs.backend.outputs.address }}
+      result:
+        value: ${{ jobs.backend.outputs.result }}
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  backend:
+    name: Deployment
+    runs-on: ubuntu-26.04
+    environment:
+      name: ${{ inputs.target == 'production' && 'backend-production' || 'backend-preview' }}
+      url: ${{ steps.report.outputs.address }}
+    outputs:
+      instance_id: ${{ steps.report.outputs.instance_id }}
+      address: ${{ steps.report.outputs.address }}
+      result: ${{ steps.report.outputs.result }}
+    env:
+      COMPONENT: backend
+      DEPLOY_BRANCH: ${{ github.head_ref || github.ref_name }}
+      DEPLOY_TARGET: ${{ inputs.target }}
+      NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+      NEON_PARENT_BRANCH_ID: ${{ vars.NEON_PARENT_BRANCH_ID }}
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_FRONTEND_PROJECT_ID: ${{ vars.VERCEL_FRONTEND_PROJECT_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_BACKEND_PROJECT_ID }}
+    steps:
+      - name: 🔍 Detect changes
+        uses: $/.github/actions/component-changes
+        with:
+          path: backend/
+          update: ${{ inputs.update }}
+      - name: 🌱 Ensure instance
+        uses: $/.github/actions/component-instance
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        with:
+          operation: ensure
+      - name: 📥 Check out source
+        if: env.BUILD_NEEDED == 'true'
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: ⚙️ Set up uv and Python
+        uses: astral-sh/setup-uv@v10.3.2
+        if: env.BUILD_NEEDED == 'true'
+        env:
+          # The project venv gets a managed Python 3.14; later uv commands reuse that venv.
+          # https://docs.astral.sh/uv/reference/environment/#uv_python_preference
+          UV_PYTHON_PREFERENCE: only-managed
+        with:
+          working-directory: backend
+          enable-cache: true
+          cache-python: true
+          activate-environment: true
+      - name: 📦 Install dependencies
+        if: env.BUILD_NEEDED == 'true'
+        # language=bash
+        run: uv sync --directory backend --locked
+      - name: 🧹 Lint
+        if: ${{ !cancelled() && env.BUILD_NEEDED == 'true' }}
+        # language=bash
+        run: uv run --directory backend --locked ruff check --output-format=github
+      - name: 🎨 Check formatting
+        if: ${{ !cancelled() && env.BUILD_NEEDED == 'true' }}
+        # language=bash
+        run: uv run --directory backend --locked ruff format --check --output-format=github
+      - name: 🧪 Run tests
+        if: ${{ !cancelled() && env.BUILD_NEEDED == 'true' }}
+        env:
+          PYTEST_RUN_PATH: backend
+        # language=bash
+        run: uv run --directory backend --locked pytest -q
+      - name: ⚙️ Set up Vercel CLI
+        if: env.BUILD_NEEDED == 'true'
+        uses: $/.github/actions/setup-vercel-cli
+      - name: 📥 Pull project configuration
+        if: env.BUILD_NEEDED == 'true'
+        uses: $/.github/actions/component-instance
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        with:
+          operation: pull
+      - name: 🔨 Package version
+        if: env.BUILD_NEEDED == 'true'
+        uses: $/.github/actions/component-instance
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        with:
+          operation: package
+      - name: 🔐 Resolve settings
+        if: env.BUILD_NEEDED == 'true'
+        uses: $/.github/actions/component-instance
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        with:
+          operation: settings
+      - name: 🚀 Release update
+        if: env.BUILD_NEEDED == 'true'
+        uses: $/.github/actions/component-instance
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        with:
+          operation: release
+      - name: 📝 Report instance
+        id: report
+        uses: $/.github/actions/component-instance
+        with:
+          operation: report

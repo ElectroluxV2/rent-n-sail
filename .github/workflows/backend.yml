@@ -1,64 +1,26 @@
-name: Backend CI
-
+name: ⚙️ Manual backend CI/CD
 on:
-  pull_request:
-    paths:
-      - "backend/**"
-      - ".github/workflows/backend.yml"
   workflow_dispatch:
-
+    inputs:
+      target:
+        type: choice
+        options: [preview, production]
+        default: preview
+      update:
+        type: boolean
+        default: true
 permissions:
   contents: read
-
+  pull-requests: write
+concurrency:
+  group: stack-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: false
+  queue: max
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    
-    env:
-      PNPM_CONFIG_COLOR: always
-      FORCE_COLOR: "1"
-    
-    defaults:
-      run:
-        working-directory: backend
-        
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7.0.1
-        with:
-          fetch-depth: 0
-          filter: tree:0
-          persist-credentials: false
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v10.3.2
-        with:
-          working-directory: backend
-          enable-cache: true
-
-      - name: Install dependencies
-        # language=bash
-        run: uv sync --locked
-        
-      - name: Lint (Ruff)
-        if: always()
-        uses: astral-sh/ruff-action@v4.1.0
-        with:
-          src: backend
-          version-file: backend/uv.lock
-          # language=bash
-          args: check --output-format=github
-
-      - name: Format (Ruff)
-        if: always()
-        uses: astral-sh/ruff-action@v4.1.0
-        with:
-          src: backend
-          version-file: backend/uv.lock
-          # language=bash
-          args: format --check --output-format=github
-
-      - name: Run Unit Tests (Pytest)
-        if: always()
-        # language=bash
-        run: uv run --locked pytest -q
+  backend:
+    name: ⚙️ Backend
+    uses: $/.github/workflows/reusable-backend.yml
+    with:
+      target: ${{ inputs.target }}
+      update: ${{ inputs.update }}
+    secrets: inherit

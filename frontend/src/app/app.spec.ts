@@ -2,17 +2,12 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { App } from './app';
-import { BACKEND_API_URL } from './backend-api-url';
 
 describe('App', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [App],
-      providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        { provide: BACKEND_API_URL, useValue: 'https://frontend.test/api' },
-      ],
+      providers: [provideHttpClient(), provideHttpClientTesting()],
     }).compileComponents();
   });
 
@@ -25,21 +20,21 @@ describe('App', () => {
     const http = TestBed.inject(HttpTestingController);
     fixture.detectChanges();
 
-    http.expectOne('https://frontend.test/api/health').flush({ result: 'ok' });
+    http.expectOne('/api/').flush({ Hello: 'World' });
     await fixture.whenStable();
     fixture.detectChanges();
 
     const element = fixture.nativeElement as HTMLElement;
-    expect(element.textContent).toContain('Backend says: ok');
+    expect(element.textContent).toContain('Backend says: World');
 
     element
       .querySelector('form')
       ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     fixture.detectChanges();
-    http.expectOne('https://frontend.test/api/health').flush({ result: 'ok' });
+    http.expectOne('/api/').flush({ Hello: 'World again' });
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(element.textContent).toContain('Backend says: ok');
+    expect(element.textContent).toContain('Backend says: World again');
   });
 });

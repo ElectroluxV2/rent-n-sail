@@ -1,0 +1,15 @@
+[project]
+name = "rent-n-sail-database"
+version = "0.1.0"
+requires-python = "==3.14.*"
+dependencies = [
+    "alembic>=1.16.0",
+    "sqlalchemy>=2.0.33",
+    "psycopg[binary]>=3.2.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-github-actions-annotate-failures>=0.4.2",
+]

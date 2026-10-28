@@ -1,21 +1,14 @@
-import { ApplicationConfig, inject, mergeApplicationConfig, REQUEST } from '@angular/core';
+import { ApplicationConfig, mergeApplicationConfig } from '@angular/core';
 import { provideServerRendering, withRoutes } from '@angular/ssr';
+import { env } from 'node:process';
 import { appConfig } from './app.config';
 import { serverRoutes } from './app.routes.server';
-import { BACKEND_API_URL } from './backend-api-url';
-
-const localFrontendUrl = 'http://127.0.0.1:4200';
+import { provideServerBackendApi } from './backend-api-url';
 
 const serverConfig: ApplicationConfig = {
   providers: [
     provideServerRendering(withRoutes(serverRoutes)),
-    {
-      provide: BACKEND_API_URL,
-      useFactory: () => {
-        const request = inject(REQUEST);
-        return new URL('/api', request?.url ?? localFrontendUrl).href;
-      },
-    },
+    provideServerBackendApi(env['BACKEND_URL']),
   ],
 };
 

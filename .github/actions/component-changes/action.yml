@@ -1,0 +1,42 @@
+name: Detect component changes
+description: >-
+  Decide whether a component needs an update. It diffs the event's before/after commits in a bare, blobless
+  clone, so no checkout is needed, and checks whether any changed path contains the component's path. The
+  manual update checkbox overrides a clean diff. The step logs the changed paths, both reasons, and the
+  outcome, and exports BUILD_NEEDED (true or false) to the job environment for every later stage.
+inputs:
+  path:
+    description: Path substring that marks the component's files, for example backend/. Any changed path containing it counts as a change.
+    required: true
+  update:
+    description: Update even when the diff does not touch the path; the manual workflows pass their update checkbox here.
+    required: false
+    default: "false"
+runs:
+  using: composite
+  steps:
+    - name: 🔍 Diff component path
+      shell: bash
+      env:
+        CHECK_PATH: ${{ inputs.path }}
+        UPDATE_REQUESTED: ${{ inputs.update }}
+        # push and pull_request synchronize events carry before/after. Opened/reopened pull requests
+        # have neither, so they compare the PR base with the merge commit (github.sha); manual runs
+        # compare the current commit with itself, which reports no changes.
+        BEFORE: ${{ github.event.before || github.event.pull_request.base.sha || github.sha }}
+        AFTER: ${{ github.event.after || github.sha }}
+        GH_TOKEN: ${{ github.token }}
+      # language=bash
+      run: |
+        repo="$RUNNER_TEMP/changes.git"
+        GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+        export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.extraHeader GIT_CONFIG_VALUE_0
+        printf '::add-mask::%s\n' "${GIT_CONFIG_VALUE_0#*basic }"
+        git init --bare --quiet "$repo"
+        git -C "$repo" fetch --quiet --depth=1 --filter=blob:none "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" "$BEFORE" "$AFTER"
+        paths=$(git -C "$repo" diff --name-only --no-renames -z "$BEFORE" "$AFTER" | jq -Rs 'split("\u0000")[:-1]')
+        printf 'Searched path: %s\nChanged paths:\n' "$(jq -Rn --arg path "$CHECK_PATH" '$path')"
+        jq -C . <<< "$paths"
+        changed=$(jq --arg path "$CHECK_PATH" 'any(.[]; contains($path))' <<< "$paths")
+        printf 'Path changed: %s\nUpdate requested: %s\n' "$changed" "$UPDATE_REQUESTED"
+        jq -rn --argjson changed "$changed" --argjson update "$UPDATE_REQUESTED" '"BUILD_NEEDED=\($changed or $update)"' | tee -a "$GITHUB_ENV"

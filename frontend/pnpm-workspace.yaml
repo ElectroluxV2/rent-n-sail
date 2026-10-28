@@ -3,3 +3,4 @@ allowBuilds:
   esbuild: true
   lmdb: false
   msgpackr-extract: false
+trustLockfile: true
