@@ -1,13 +1,8 @@
 # AI usage docs
 
-## 2026-10-28 — Sequence diagrams of every CI/CD path
+## 2026-10-30 — Sequence diagrams of every CI/CD path
 
-- AI assistance: OpenCode (Claude Opus 5.5) added `docs/cicd.md`, next to `docs/auth-flow.md`. It holds 12 Mermaid sequence diagrams and an outcome table that cover every trigger, target, and component path of the pipeline. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
-  - **Coverage:**
-    - Triggers and job order: pull requests, merges, manual runs, the per-branch queue, and pull requests from forks.
-    - The pull request lifecycle, and the mechanisms each job uses: change detection, ensure, preview cleanup, forks, and settings and aliases.
-    - Each component job, the report's results, and failures.
-  - **Checks:** read every diagram against the workflows, the actions, and `providers.cjs`. Rendered each one with Mermaid CLI using GitHub's default theme and fonts, to catch syntax errors and overflowing text.
+- AI assistance: Gemini Flash 3 written mermaid diagrams from screenshot of created diagrams via Excalidraw https://excalidraw.com/#json=hSJBNy8qq1DWdF3ZTlI89,K7wTxdvbf3TxpDP_I0N1FA
 
 ## 2026-10-28 — Delete previews of branches without an open pull request
 
