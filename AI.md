@@ -8,6 +8,26 @@
   - **Failures:** a failed cleanup only warns, so it never blocks a release; the next run retries it.
   - **Verification:** a throwaway mock of both providers and the real bundled SDK against a stubbed `fetch`; no tests were added, per project guidelines. Stack run `40751355386` then deleted the previews of the merged `cd` and of teammate PRs #16 and #17, which were closed without merging. That was 3 Neon branches, plus 3 aliases and 4 deployments in the backend and 3 aliases and 5 deployments in the frontend. It then forked this branch's previews, and the deleted aliases return `DEPLOYMENT_NOT_FOUND`. A re-run reused the previews and deleted nothing.
 
+## 2026-10-29 — Explain executing an SQL script with asyncpg
+
+- AI assistance: OpenCode (GPT-6.1 Terra) explained using SQLAlchemy's adapted connection to execute a multi-statement script with asyncpg rather than splitting on semicolons. Attribution: `@Buzeqq` (Miłosz Chojnacki, verified with `gh api user`).
+
+## 2026-10-29 — Configure AuthTuna application role
+
+- AI assistance: OpenCode (GPT-6.1 Terra) added an Alembic migration to grant an existing application login role access to AuthTuna and set its database-specific search path. The user selected an existing role identified by `APP_DATABASE_ROLE`; no credentials are created. Attribution: `@Buzeqq` (Miłosz Chojnacki, verified with `gh api user`).
+
+## 2026-10-29 — Explain AuthTuna schema lookup
+
+- AI assistance: OpenCode (GPT-6.1 Terra) inspected AuthTuna's engine setup and explained how to configure PostgreSQL's search path for its unqualified table names. Attribution: `@Buzeqq` (Miłosz Chojnacki, verified with `gh api user`).
+
+## 2026-10-29 — Explain duplicate migration sequences
+
+- AI assistance: OpenCode (GPT-6.1 Terra) identified that the AuthTuna SQL defines serial columns and then explicitly creates the same sequences again. Attribution: `@Buzeqq` (Miłosz Chojnacki, verified with `gh api user`).
+
+## 2026-10-29 — Explain migration prepared-statement error
+
+- AI assistance: OpenCode (GPT-6.1 Terra) inspected the Alembic migrations and identified that the AuthTuna SQL file contains multiple commands passed to a single asyncpg prepared statement. Also noted a schema mismatch that may surface after that is fixed. The error was not reproduced against a database. Attribution: `@Buzeqq` (Miłosz Chojnacki, verified with `gh api user`).
+
 ## 2026-10-28 — Benchmark: vendored SDK bundle vs. cached pnpm install
 
 - AI assistance: OpenCode (Claude Opus 5.5) pulled the user's seven new `cd` commits by fast-forward, then benchmarked provider SDK loading on a throwaway branch, `sdk-install-benchmark`. Run `40654874805` used `ubuntu-26.04` with 5 samples per variant, and the results are posted as a PR #14 comment. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).

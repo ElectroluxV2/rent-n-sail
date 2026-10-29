@@ -86,7 +86,7 @@ async def register_complete(
         await auth_service.passkeys.save_new_credential(
             user_id=user_id,
             cred_data=credential_data,
-            nickname=user_agent,
+            nickname=user_agent[:100],
         )
         user = await auth_service.users.get_by_id(user_id)
         if user is None:
@@ -97,7 +97,7 @@ async def register_complete(
         request.session.pop(PASSKEY_FLOW_USER_ID_SESSION_KEY, None)
     except Exception as error:
         logger.exception("Passkey registration verification failed", exc_info=error)
-        auth_service.users.delete(user_id)  # clean up failed registration process
+        await auth_service.users.delete(user_id)  # clean up failed registration process
         raise HTTPException(400, "Passkey registration failed.") from None
 
     logger.info("Passkey registration succeeded")
