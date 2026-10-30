@@ -16,7 +16,7 @@ subgraph s_sub["1. stack (Orchestrator)"]
 s_start(("On push to main\nor PR")):::trigger --> s_db["DB Deploy"]
 s_db --> s_be["Backend Deploy"]
 s_be --> s_fe["Frontend Deploy"]
-s_fe --> s_end(("fa:circle-check"))
+s_fe --> s_end(("✅"))
 class s_end successIcon
 end
 
@@ -25,7 +25,7 @@ subgraph pillar_db["DATABASE ARCHITECTURE"]
 %% 2. DATABASE SIMPLE
 subgraph dbs_sub["2. database"]
 dbs_start(("on dispatch")):::trigger --> dbs_dep["DB Deploy"]
-dbs_dep --> dbs_end(("fa:circle-check"))
+dbs_dep --> dbs_end(("✅"))
 class dbs_end successIcon
 end
 
@@ -40,7 +40,7 @@ end
       rd_chosen --> rd_det["Detect Changes"]
       rd_det --> rd_any{"any changes?"}:::decision
       rd_any -- "Y" --> rd_apply["Apply migrations"]
-      rd_any -- "N" --> rd_ready(("fa:circle-check DB ready"))
+      rd_any -- "N" --> rd_ready(("✅ DB ready"))
       class rd_ready successIcon
     end
 
@@ -59,7 +59,7 @@ subgraph pillar_be["BACKEND ARCHITECTURE"]
 %% 5. BACKEND SIMPLE
 subgraph bes_sub["5. backend"]
 bes_start(("on dispatch")):::trigger --> bes_dep["backend Deploy"]
-bes_dep --> bes_end(("fa:circle-check"))
+bes_dep --> bes_end(("✅"))
 class bes_end successIcon
 end
 
@@ -74,7 +74,7 @@ end
       rb_chosen --> rb_det["Detect Changes"]
       rb_det --> rb_any{"any changes?"}:::decision
       rb_any -- "Y" --> rb_build["build backend"]
-      rb_any -- "N" --> rb_ready(("fa:circle-check BE ready"))
+      rb_any -- "N" --> rb_ready(("✅ BE ready"))
       class rb_ready successIcon
     end
 
@@ -99,7 +99,7 @@ subgraph pillar_fe["FRONTEND ARCHITECTURE"]
 %% 8. FRONTEND SIMPLE
 subgraph fes_sub["8. frontend"]
 fes_start(("on dispatch")):::trigger --> fes_dep["frontend Deploy"]
-fes_dep --> fes_end(("fa:circle-check"))
+fes_dep --> fes_end(("✅"))
 class fes_end successIcon
 end
 
@@ -114,7 +114,7 @@ end
       rf_chosen --> rf_det["Detect Changes"]
       rf_det --> rf_any{"any changes?"}:::decision
       rf_any -- "Y" --> rf_build["build frontend"]
-      rf_any -- "N" --> rf_ready(("fa:circle-check FE ready"))
+      rf_any -- "N" --> rf_ready(("✅ FE ready"))
       class rf_ready successIcon
     end
 
