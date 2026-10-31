@@ -4,6 +4,7 @@ import {
   isMainModule,
   writeResponseToNodeResponse,
 } from '@angular/ssr/node';
+import { isDevMode } from '@angular/core';
 import express from 'express';
 import { request as httpRequest } from 'node:http';
 import { request as httpsRequest } from 'node:https';
@@ -27,7 +28,10 @@ const allowedHosts = [
   // Portless supplies the local URL; Angular expects only its hostname.
   portlessUrl ? new URL(portlessUrl).hostname : undefined,
 ].filter((host): host is string => Boolean(host));
-const angularApp = new AngularNodeAppEngine({ allowedHosts });
+const angularApp = new AngularNodeAppEngine({
+  allowedHosts,
+  trustProxyHeaders: isDevMode(),
+});
 
 app.use((req, res, next) => {
   if (req.hostname !== canonicalFrontendUrl.hostname) {
