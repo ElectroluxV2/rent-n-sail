@@ -40,6 +40,7 @@ end
       rd_chosen --> rd_det["Detect Changes"]
       rd_det --> rd_any{"any changes?"}:::decision
       rd_any -- "Y" --> rd_apply["Apply migrations"]
+      rd_apply --> rd_ready
       rd_any -- "N" --> rd_ready(("✅ DB ready"))
       class rd_ready successIcon
     end
@@ -74,6 +75,7 @@ end
       rb_chosen --> rb_det["Detect Changes"]
       rb_det --> rb_any{"any changes?"}:::decision
       rb_any -- "Y" --> rb_build["build backend"]
+      rb_build --> rb_ready
       rb_any -- "N" --> rb_ready(("✅ BE ready"))
       class rb_ready successIcon
     end
