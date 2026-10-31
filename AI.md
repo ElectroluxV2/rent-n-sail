@@ -4,9 +4,9 @@
 
 - AI assistance: Junie (gpt-6-luna) configured Angular's SSR engine to trust only `X-Forwarded-For` in dev mode, leaving all proxy headers untrusted in production, and prepared the change as the first layer in a `gh-stack` stack. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
 
-## 2026-10-31 — Compare component changes from the PR target on open
+## 2026-10-31 — Select PR target SHA with GitHub `case()`
 
-- AI assistance: Junie (gpt-6-luna) updated the component-changes action to use the pull request target branch SHA as `BEFORE` on opened and reopened events, preventing a nonempty event `before` value from omitting changes in the new PR. Other events keep their existing before/current SHA behavior. Prepared as the second layer in the `gh-stack` stack. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- AI assistance: Junie (gpt-6-luna) updated the component-changes action to use GitHub's `case()` expression to select the pull request target branch SHA as `BEFORE` on opened and reopened events, preventing a nonempty event `before` value from omitting changes in the new PR. Other events keep their existing before/current SHA behavior; no Bash selection logic is used. Prepared as the second layer in the `gh-stack` stack. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
 
 ## 2026-10-28 — Delete previews of branches without an open pull request
 
