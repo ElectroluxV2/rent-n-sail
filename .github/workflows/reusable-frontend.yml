@@ -55,6 +55,7 @@ jobs:
         if: env.BUILD_NEEDED == 'true'
         uses: actions/checkout@v7.0.1
         with:
+          lfs: true
           persist-credentials: false
       # Also installs the locked dependencies.
       - name: ⚙️ Set up Node.js and pnpm

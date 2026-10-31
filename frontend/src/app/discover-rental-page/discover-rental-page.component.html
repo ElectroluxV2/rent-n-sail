@@ -1,0 +1,43 @@
+<section>
+  @for (item of equipment; track item.name) {
+    <article>
+      <img
+        [ngSrc]="item.slug"
+        [fill]="true"
+        [priority]="$index < 3"
+        [alt]="item.name"
+        sizes="100vw"
+      />
+      <div class="rental-content">
+        <main>
+          <h2>{{ item.name }}</h2>
+          <p>{{ item.description }}</p>
+          <p class="capacity">
+            <span class="material-symbols-outlined" aria-hidden="true">people_size_increase</span>
+            <span>
+              {{ item.capacity.min | formatRange: item.capacity.max }}
+              {{ item.capacity.max | i18nPlural: capacityNoun }}
+            </span>
+          </p>
+        </main>
+        <aside class="booking-panel" aria-label="Rental pricing">
+          <ul>
+            <li>
+              <span>1 hour</span>
+              <strong>{{ item.hourlyRate | currency: 'USD' }}</strong>
+            </li>
+            <li>
+              <span>2 hours · 10% off/hr</span>
+              <strong>{{ item.hourlyRate * 2 * 0.9 | currency: 'USD' }}</strong>
+            </li>
+            <li>
+              <span>Full day · 50% off/hr</span>
+              <strong>{{ item.hourlyRate * 8 * 0.5 | currency: 'USD' }}</strong>
+            </li>
+          </ul>
+          <button type="button" [attr.aria-label]="'Book ' + item.name + ' now'">Book now!</button>
+        </aside>
+      </div>
+    </article>
+  }
+</section>
