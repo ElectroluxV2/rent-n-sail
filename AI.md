@@ -1,5 +1,9 @@
 # AI usage docs
 
+## 2026-10-31 — Trust the forwarded client IP header only in Angular dev mode
+
+- AI assistance: Junie (gpt-6-luna) configured Angular's SSR engine to trust only `X-Forwarded-For` in dev mode, leaving all proxy headers untrusted in production, and prepared the change as the first layer in a `gh-stack` stack. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
 ## 2026-10-28 — Delete previews of branches without an open pull request
 
 - AI assistance: OpenCode (Claude Opus 5.5) made each component's `ensure` stage delete its provider's previews of Git branches that have no open pull request, keeping the run's own branch. This replaces a proposed 3-day expiry, which Vercel cannot express: its retention has no 3-day option and never deletes previews with an alias. The production run after a merge now removes the merged branch's previews. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
