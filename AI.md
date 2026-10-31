@@ -1,5 +1,9 @@
 # AI usage docs
 
+## 2026-10-31 — Fetch Git LFS images for frontend deployments
+
+- AI assistance: Junie (gpt-6-luna) enabled Git LFS checkout in the frontend deployment workflow so optimized image files are available to the build instead of being deployed as pointer files. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
 ## 2026-10-31 — Fix rental discovery frontend CI and lint failures
 
 - AI assistance: Junie (gpt-6-luna) removed obsolete backend/form behavior from the root app, updated the existing app test to verify the default rental route, formatted `app.html`, and made `FormatRangePipe` implement `PipeTransform` to pass the frontend quality gates. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
