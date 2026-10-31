@@ -4,6 +4,10 @@
 
 - AI assistance: Junie (gpt-6-luna) configured Angular's SSR engine to trust only `X-Forwarded-For` in dev mode, leaving all proxy headers untrusted in production, and prepared the change as the first layer in a `gh-stack` stack. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
 
+## 2026-10-31 — Compare component changes from the PR target on open
+
+- AI assistance: Junie (gpt-6-luna) updated the component-changes action to use the pull request target branch SHA as `BEFORE` on opened and reopened events, preventing a nonempty event `before` value from omitting changes in the new PR. Other events keep their existing before/current SHA behavior. Prepared as the second layer in the `gh-stack` stack. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
 ## 2026-10-28 — Delete previews of branches without an open pull request
 
 - AI assistance: OpenCode (Claude Opus 5.5) made each component's `ensure` stage delete its provider's previews of Git branches that have no open pull request, keeping the run's own branch. This replaces a proposed 3-day expiry, which Vercel cannot express: its retention has no 3-day option and never deletes previews with an alias. The production run after a merge now removes the merged branch's previews. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).

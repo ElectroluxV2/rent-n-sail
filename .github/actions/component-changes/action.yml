@@ -20,14 +20,23 @@ runs:
       env:
         CHECK_PATH: ${{ inputs.path }}
         UPDATE_REQUESTED: ${{ inputs.update }}
-        # push and pull_request synchronize events carry before/after. Opened/reopened pull requests
-        # have neither, so they compare the PR base with the merge commit (github.sha); manual runs
-        # compare the current commit with itself, which reports no changes.
-        BEFORE: ${{ github.event.before || github.event.pull_request.base.sha || github.sha }}
+        # Opened/reopened pull requests compare the target branch with the merge commit; pushes and
+        # pull_request synchronize events compare their before/after commits. Manual runs compare the
+        # current commit with itself, which reports no changes.
+        EVENT_BEFORE: ${{ github.event.before || github.sha }}
+        PULL_REQUEST_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         AFTER: ${{ github.event.after || github.sha }}
         GH_TOKEN: ${{ github.token }}
       # language=bash
       run: |
+        case "$GITHUB_EVENT_NAME:$GITHUB_EVENT_ACTION" in
+          pull_request:opened|pull_request:reopened)
+            BEFORE="$PULL_REQUEST_BASE_SHA"
+            ;;
+          *)
+            BEFORE="$EVENT_BEFORE"
+            ;;
+        esac
         repo="$RUNNER_TEMP/changes.git"
         GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
         export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.extraHeader GIT_CONFIG_VALUE_0
