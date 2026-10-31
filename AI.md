@@ -1,5 +1,197 @@
 # AI usage docs
 
+## 2026-10-31 — Ignore JPGs and use Git LFS for other raster images
+
+- AI assistance: Junie (gpt-6-luna) added a `.jpg` ignore rule and configured common non-JPG raster image formats for Git LFS. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Start full-width rental blur at heading
+
+- AI assistance: Junie (gpt-6-luna) removed the fixed blur breakpoint and anchored the full-width rental-card blur overlay to each card's heading, with a full-card fallback for browsers without anchor positioning. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Make rental image preconnect deployment-independent
+
+- AI assistance: Junie (gpt-6-luna) replaced the hard-coded rental image preconnect host with a root-relative URL that resolves to the current deployment origin. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Prioritize first three rental images
+
+- AI assistance: Junie (gpt-6-luna) limited high-priority loading to the first three rental images and added a preconnect hint for `https://frontend.localhost`. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Use fill mode for cropped rental images
+
+- AI assistance: Junie (gpt-6-luna) switched rental card images to `NgOptimizedImage` fill mode so their intentional `object-fit: cover` crops do not trigger aspect-ratio mismatch warnings. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Format rental capacity ranges with Intl
+
+- AI assistance: Junie (gpt-6-luna) added a standalone `FormatRangePipe` that uses `Intl.NumberFormat.formatRange()` for locale-aware rental capacity ranges. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Pluralize rental capacity with Angular
+
+- AI assistance: Junie (gpt-6-luna) converted mock passenger capacities to numeric ranges and used Angular's `I18nPluralPipe` to select the singular or plural passenger label. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Enlarge rental capacity text
+
+- AI assistance: Junie (gpt-6-luna) reverted the black text with white outline on the rental capacity label to white text and increased its font size to 1.25rem. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Add white outline to rental capacity
+
+- AI assistance: Junie (gpt-6-luna) styled the rental capacity label with black text and a white outline. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Move rental capacity below description
+
+- AI assistance: Junie (gpt-6-luna) moved each rental's passenger capacity icon and label to the bottom-left details area beneath its description. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Show rental passenger capacity
+
+- AI assistance: Junie (gpt-6-luna) added mock passenger capacity to each rental listing and displayed it beside the Material Symbols people icon above pricing. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Balance rental descriptions
+
+- AI assistance: Junie (gpt-6-luna) applied balanced text wrapping to rental descriptions so paragraphs distribute more evenly across lines. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Fix rental image and card sizing
+
+- AI assistance: Junie (gpt-6-luna) constrained the routed page and rental card grid to the available area below navigation so images with different intrinsic dimensions consistently fill each card. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Size rental articles below navigation
+
+- AI assistance: Junie (gpt-6-luna) sized the app shell to the viewport and made rental articles fill the remaining space below the navigation. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Scope rental scroll snapping to discover page
+
+- AI assistance: Junie (gpt-6-luna) removed document-wide scroll snapping and made the discovery section the local vertical snap scroller, keeping navigation scrolling independent. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Restore rental page scroll snapping
+
+- AI assistance: Junie (gpt-6-luna) moved vertical scroll snapping to the document viewport, the active page scroller, while preserving snap alignment on rental cards. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Remove full-day duration note
+
+- AI assistance: Junie (gpt-6-luna) removed the full-day duration note from rental booking panels. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Wrap rental details and pricing with flexbox
+
+- AI assistance: Junie (gpt-6-luna) grouped each rental card's text and pricing under a wrapping flex parent, replacing breakpoint-specific stacking with intrinsic flex wrapping. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Remove dividers between rental prices
+
+- AI assistance: Junie (gpt-6-luna) removed the divider lines between the rental pricing rows. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Right-align rental pricing
+
+- AI assistance: Junie (gpt-6-luna) aligned the rental pricing text to the right within each pricing row. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Style rental pricing with orange text and purple outline
+
+- AI assistance: Junie (gpt-6-luna) styled the rental pricing labels and amounts with orange text and a purple outline. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Remove rental pricing panel container
+
+- AI assistance: Junie (gpt-6-luna) removed the rental pricing panel's background container styling and moved the full-day duration note below the booking button. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Use Google Sans Flex for rental page text
+
+- AI assistance: Junie (gpt-6-luna) loaded Google Sans Flex in the app document and applied it as the rental discovery page's base font, preserving the existing heading and description fonts while avoiding Angular's inline-font budget. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Set full-day rental discount to 50%
+
+- AI assistance: Junie (gpt-6-luna) changed the full-day rental discount from 90% to 50% and updated the displayed total accordingly. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Add rental pricing and booking buttons
+
+- AI assistance: Junie (gpt-6-luna) added per-item mock hourly rates, discounted two-hour and eight-hour-day totals, and a styled booking button to rental cards. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Explain rental image blur mask
+
+- AI assistance: Junie (gpt-6-luna) explained that the rental image `mask-image` fades the `backdrop-filter` blur from the 70% breakpoint to the bottom, while the background gradient independently fades the tint. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Confirm backdrop-filter for rental image blur
+
+- AI assistance: Junie (gpt-6-luna) confirmed the rental image overlay already uses `backdrop-filter` to blur the image behind it, and recommended keeping it for this effect. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Restore full-image rental blur
+
+- AI assistance: Junie (gpt-6-luna) moved the fading backdrop blur and gradient from the listing text container back across each rental image. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Extract rental blur breakpoint into an SCSS variable
+
+- AI assistance: Junie (gpt-6-luna) replaced the repeated 70% blur-gradient breakpoint in the rental discovery stylesheet with an SCSS variable. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Nest rental discovery styles
+
+- AI assistance: Junie (gpt-6-luna) converted the rental discovery page stylesheet to native CSS nesting without changing its styles. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Confine rental blur to listing text
+
+- AI assistance: Junie (gpt-6-luna) confined the fading backdrop blur and gradient to the rental listing text container instead of applying it across the full image. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Add a fading blur and gradient to rental images
+
+- AI assistance: Junie (gpt-6-luna) added a bottom-fading backdrop blur and 30% black gradient to rental images, beginning at 70% from the top. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Add a black outline to rental descriptions
+
+- AI assistance: Junie (gpt-6-luna) added a black text outline to rental listing descriptions. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Apply Gabriela to rental descriptions
+
+- AI assistance: Junie (gpt-6-luna) loaded the Gabriela Google Font and applied its regular style to rental listing descriptions. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Add white outlines to rental headings
+
+- AI assistance: Junie (gpt-6-luna) styled rental listing headings with black text and a white outline. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Set rental headings to 60% image width
+
+- AI assistance: Junie (gpt-6-luna) set rental listing `h2` headings to 60% of the image width. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Apply Londrina Sketch to rental headings
+
+- AI assistance: Junie (gpt-6-luna) loaded the Londrina Sketch Google Font and applied it to rental listing `h2` headings. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Snap rental articles while scrolling
+
+- AI assistance: Junie (gpt-6-luna) made the rental listing section a vertical scroll-snap container and aligned each article to its start edge. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Overlay rental listing text on images
+
+- AI assistance: Junie (gpt-6-luna) changed each rental article to a grid and positioned its grouped heading and description at the image's bottom-left corner. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Set rental images to viewport height
+
+- AI assistance: Junie (gpt-6-luna) set discovery-page rental images to `100svh` height and `100%` width. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Rotate the fishing boat image
+
+- AI assistance: Junie (gpt-6-luna) rotated the fishing boat JPEG 90 degrees clockwise, regenerated its responsive AVIF/WebP variants, and updated its catalog dimensions. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Configure a local rental image loader
+
+- AI assistance: Junie (gpt-6-luna) configured `NgOptimizedImage` with a custom loader for the existing responsive WebP rental images, replacing the template-built AVIF/WebP `srcset` markup. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Optimize rental catalog images
+
+- AI assistance: Junie (gpt-6-luna) converted each rental image into responsive AVIF and WebP variants, retained the JPEG originals as fallbacks, and updated `DiscoverRentalPageComponent` to use `NgOptimizedImage`. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Update mock water equipment catalog
+
+- AI assistance: Junie (gpt-6-luna) removed the wetsuit listing and added kite surfing and jet boarding listings to `DiscoverRentalPageComponent`. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Render rental equipment listings
+
+- AI assistance: Junie (gpt-6-luna) updated `DiscoverRentalPageComponent` to render each mock equipment entry as an article with its name and description. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Expand mock water equipment catalog
+
+- AI assistance: Junie (gpt-6-luna) added mock listings for a pontoon boat, fishing boat, windsurfing board, wakeboard, water skis, towable tube, snorkeling set, and wetsuit to `DiscoverRentalPageComponent`. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Add mock water equipment listings
+
+- AI assistance: Junie (gpt-6-luna) added a mock array of commonly rented water equipment with brief descriptions to `DiscoverRentalPageComponent`. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
+## 2026-10-31 — Add the default rental discovery page
+
+- AI assistance: Junie (gpt-6-luna) generated `DiscoverRentalPageComponent` with Angular CLI, routed the default URL to it, and placed a router outlet in the app template. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
 ## 2026-10-31 — Trust the forwarded client IP header only in Angular dev mode
 
 - AI assistance: Junie (gpt-6-luna) configured Angular's SSR engine to trust only `X-Forwarded-For` in dev mode, leaving all proxy headers untrusted in production, and prepared the change as the first layer in a `gh-stack` stack. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
