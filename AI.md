@@ -1,5 +1,9 @@
 # AI usage docs
 
+## 2026-10-31 — Fix rental discovery frontend CI and lint failures
+
+- AI assistance: Junie (gpt-6-luna) removed obsolete backend/form behavior from the root app, updated the existing app test to verify the default rental route, formatted `app.html`, and made `FormatRangePipe` implement `PipeTransform` to pass the frontend quality gates. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+
 ## 2026-10-31 — Ignore JPGs and use Git LFS for other raster images
 
 - AI assistance: Junie (gpt-6-luna) added a `.jpg` ignore rule and configured common non-JPG raster image formats for Git LFS. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).

@@ -1,40 +1,31 @@
+import { IMAGE_CONFIG, IMAGE_LOADER } from '@angular/common';
 import { TestBed } from '@angular/core/testing';
-import { provideHttpClient } from '@angular/common/http';
-import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { Router } from '@angular/router';
+import { provideRouter } from '@angular/router';
 import { App } from './app';
+import { rentalImageLoader } from './discover-rental-page/discover-rental-image-loader';
+import { routes } from './app.routes';
 
 describe('App', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [App],
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [
+        provideRouter(routes),
+        { provide: IMAGE_LOADER, useValue: rentalImageLoader },
+        { provide: IMAGE_CONFIG, useValue: { breakpoints: [640, 960, 1440] } },
+      ],
     }).compileComponents();
   });
 
-  afterEach(() => {
-    TestBed.inject(HttpTestingController).verify();
-  });
-
-  it('should render the backend response and reload it on form submission', async () => {
+  it('should render the discover page at the default route', async () => {
     const fixture = TestBed.createComponent(App);
-    const http = TestBed.inject(HttpTestingController);
     fixture.detectChanges();
-
-    http.expectOne('/api/').flush({ Hello: 'World' });
-    await fixture.whenStable();
+    await TestBed.inject(Router).navigateByUrl('/');
     fixture.detectChanges();
 
     const element = fixture.nativeElement as HTMLElement;
-    expect(element.textContent).toContain('Backend says: World');
-
-    element
-      .querySelector('form')
-      ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-    fixture.detectChanges();
-    http.expectOne('/api/').flush({ Hello: 'World again' });
-    await fixture.whenStable();
-    fixture.detectChanges();
-
-    expect(element.textContent).toContain('Backend says: World again');
+    expect(element.querySelector('app-discover-rental-page')).not.toBeNull();
+    expect(element.querySelector('h2')?.textContent).toContain('Kayak');
   });
 });
