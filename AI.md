@@ -1,5 +1,9 @@
 # AI usage docs
 
+## 2026-10-30 — Sequence diagrams of every CI/CD path
+
+- AI assistance: Gemini Flash 3 written mermaid diagrams from screenshot of created diagrams via Excalidraw https://excalidraw.com/#json=hSJBNy8qq1DWdF3ZTlI89,K7wTxdvbf3TxpDP_I0N1FA
+
 ## 2026-10-28 — Delete previews of branches without an open pull request
 
 - AI assistance: OpenCode (Claude Opus 5.5) made each component's `ensure` stage delete its provider's previews of Git branches that have no open pull request, keeping the run's own branch. This replaces a proposed 3-day expiry, which Vercel cannot express: its retention has no 3-day option and never deletes previews with an alias. The production run after a merge now removes the merged branch's previews. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
