@@ -23,7 +23,15 @@ runs:
         # Opened/reopened pull requests compare the target branch with the merge commit; pushes and
         # pull_request synchronize events compare their before/after commits. Manual runs compare the
         # current commit with itself, which reports no changes.
-        BEFORE: ${{ case(github.event_name == 'pull_request' && (github.event.action == 'opened' || github.event.action == 'reopened'), github.event.pull_request.base.sha, github.event.before || github.sha) }}
+        BEFORE: >-
+          ${{
+            case(
+              github.event_name == 'pull_request' &&
+                (github.event.action == 'opened' || github.event.action == 'reopened'),
+              github.event.pull_request.base.sha,
+              github.event.before || github.sha
+            )
+          }}
         AFTER: ${{ github.event.after || github.sha }}
         GH_TOKEN: ${{ github.token }}
       # language=bash

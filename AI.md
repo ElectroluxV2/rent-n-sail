@@ -6,7 +6,7 @@
 
 ## 2026-10-31 — Select PR target SHA with GitHub `case()`
 
-- AI assistance: Junie (gpt-6-luna) updated the component-changes action to use GitHub's `case()` expression to select the pull request target branch SHA as `BEFORE` on opened and reopened events, preventing a nonempty event `before` value from omitting changes in the new PR. Other events keep their existing before/current SHA behavior; no Bash selection logic is used. Prepared as the second layer in the `gh-stack` stack. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
+- AI assistance: Junie (gpt-6-luna) updated the component-changes action to use a multiline GitHub `case()` expression to select the pull request target branch SHA as `BEFORE` on opened and reopened events, preventing a nonempty event `before` value from omitting changes in the new PR. Other events keep their existing before/current SHA behavior; no Bash selection logic is used. Prepared as the second layer in the `gh-stack` stack. Attribution: `@ElectroluxV2` (Mateusz Budzisz, verified with `gh api user`).
 
 ## 2026-10-28 — Delete previews of branches without an open pull request
 
